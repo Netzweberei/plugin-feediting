@@ -1,0 +1,15 @@
+{
+    "name": "ntzwbr/herbie-feediting",
+    "homepage": "http://www.netzweberei.de",
+    "description": "Herbie Plugin Frontend-Editing",
+    "keywords": ["herbie", "plugin", "in-page-editing"],
+    "type": "herbie-plugin",
+    "require": {
+        "getherbie/herbie": "dev-master"
+    },
+    "autoload": {
+        "psr-4": {
+            "herbie\\plugin\\feedting\\": ""
+        }
+    } 
+}

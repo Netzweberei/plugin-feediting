@@ -29,13 +29,24 @@ class FeeditableContent {
 
     protected $segmentid = 0;
 
+    protected $segmentLoadedMsg = '';
+
     protected $blockDimension = 100;
 
     protected $pluginConfig = [];
 
     protected $eob = PHP_EOL;
 
-    protected $contentBlocks = [];
+    protected $contentBlocks = [
+        "textBlock" => [
+            "template" => '<textarea name="###id###">%s</textarea><input type="submit" name="cmd" value="save"/>',
+            "mdregex" => '/.*/',
+            "dataregex" => '/.*/',
+            "insert" => 'array'
+        ]
+    ];
+
+    protected $remToCloseCurrentBlockWith = '';
     
     public function __construct(FeeditingPlugin &$plugin, $format, $segmentid = null, $eob = null)
     {
@@ -46,6 +57,12 @@ class FeeditableContent {
         if($segmentid) $this->segmentid = $segmentid;
         if($eob) $this->eob = $eob;
 
+        $this->init();
+
+    }
+
+    protected function init(){
+
         foreach($this->contentBlocks as $blockId => $blockDef){
             list($this->{"open".ucfirst($blockId)},$this->{"close".ucfirst($blockId)}) = explode('%s', $blockDef['template']);
         }
@@ -54,18 +71,22 @@ class FeeditableContent {
             "exclude-1" => [
                 "mdregex" => '/^-- row .*/',
                 "template" => '',
+                "insert" => 'inline'
             ],
             "exclude-2" => [
                 "mdregex" => '/^-- end --$/',
                 "template" => '',
+                "insert" => 'inline'
             ],
             "exclude-3" => [
                 "mdregex" => '/^----$/',
                 "template" => '',
+                "insert" => 'inline'
             ],
             "exclude-4" => [
                 "mdregex" => '/^$/',
                 "template" => '',
+                "insert" => 'inline'
             ],
         ], $this->contentBlocks);
     }
@@ -79,8 +100,10 @@ class FeeditableContent {
     }
 
     public function getSegment($eob=true){
-        if($eob)
+        if($eob){
+            $this->segmentLoadedMsg = 'twigify';
             return implode( $this->getEob(),  $this->getContent() );
+        }
         else
             return implode( $this->getContent() );
     }
@@ -121,6 +144,10 @@ class FeeditableContent {
         return false;
     }
 
+    public function getSegmentLoadedMsg(){
+        return $this->segmentLoadedMsg;
+    }
+
     public function encodeEditableId($elemId)
     {
         if(!($this->pluginConfig['editable_prefix'] && $this->format && $this->segmentid))
@@ -158,7 +185,7 @@ class FeeditableContent {
     }
 
     public function getEditableContainer($contentId, $content){
-        return '<form method="post"></form>';
+        return '<form method="post" name="$contentId">'.$content.'</form>';
     }
 
     private function identifyMarkdownBlocks( $content, $dimensionOffset = 0 )
@@ -174,22 +201,21 @@ class FeeditableContent {
         $lines = explode($eol, $content);
         foreach($lines as $ctr => $line)
         {
-            // index + 100 so we have enough "space" to create new blocks "on-the-fly" when editing the page
-            $lineno = $ctr * $this->blockDimension + $dimensionOffset;
-            $lineno = $lineno + $this->segmentid;
+            $lineno = $this->calcLineIndex($ctr, $dimensionOffset);
 
             switch($line)
             {
                 default:
 
-                    // group defined elements in their own block
-                    foreach($this->contentBlocks as $b_def )
+                    // group special elements in their own block
+                    foreach($this->contentBlocks as $b_type => $b_def )
                     {
-                        if(preg_match($b_def['mdregex'], $line, $test)){
+                        // look for special content which need its own block
+                        if( $b_type != 'textBlock' && preg_match($b_def['mdregex'], $line, $test)){
 
                             if($blockId) {
-                                // close previous block
-                                $ret[$blockId] .= ($this->segmentid === false) ? '' : $this->setEditableTag($blockId, $class, 'stop', MARKDOWN_EOL);
+                                // if a "normal" block of multiple lines is still open, we close it
+                                $ret[$blockId+1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'stop', $b_type, MARKDOWN_EOL);
                                 $blockId = 0;
                                 $openBlock = true;
                             }
@@ -197,7 +223,15 @@ class FeeditableContent {
                             if($b_def['template'] !== ''){
                                 // build block
                                 preg_match($b_def['dataregex'], $line, $b_data);
-                                $ret[$lineno] = sprintf($b_def['template'], end($b_data));
+                                switch($b_def['insert']){
+                                    case 'inline':
+                                        $ret[$lineno] = sprintf($this->insertEditableTag($blockId, $class, 'auto', $b_type, MARKDOWN_EOL), end($b_data));
+                                        break;
+                                    case 'array':
+                                        $ret[$lineno-1] = $this->insertEditableTag($blockId, $class, 'start', $b_type, MARKDOWN_EOL);
+                                        $ret[$lineno] = end($b_data);
+                                        $ret[$lineno+1] = $this->insertEditableTag($blockId, $class, 'stop', $b_type, MARKDOWN_EOL);
+                                }
                             } else {
                                 // don't build an editable block, eg. bootstrap-markdown's
                                 $ret[$lineno] = ( $ctr == count($lines)-1 ) ? $line : $line.$eol;
@@ -210,8 +244,8 @@ class FeeditableContent {
                     if($openBlock)
                     {
                         $blockId = $lineno;
-                        $ret[$blockId] = ($this->segmentid === false) ? '' : $this->setEditableTag($blockId, $class, 'start', MARKDOWN_EOL);
-                        $ret[$blockId] .= $line.$eol;
+                        $ret[$blockId-1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'start', 'textBlock', MARKDOWN_EOL);
+                        $ret[$blockId] = $line;
                         $openBlock = false;
                     }
                     else
@@ -221,7 +255,19 @@ class FeeditableContent {
             }
         }
 
+        // if the last block of multiple lines is still open, we close it
+        if($blockId) {
+            $ret[$blockId+1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'stop', $b_type, MARKDOWN_EOL);
+        }
+
         $this->blocks = $ret;
+    }
+
+    private function calcLineIndex($ctr, $dimensionOffset){
+        // index + 100 so we have enough "space" to create new blocks "on-the-fly" when editing the page
+        $lineno = $ctr * $this->blockDimension + $dimensionOffset;
+        $lineno = $lineno + $this->segmentid;
+        return $lineno;
     }
 
     private function stripEmptyContentblocks()
@@ -251,55 +297,55 @@ class FeeditableContent {
         $this->blocks = $stripped;
     }
 
-    private function setEditableTag( $contentUid, $contentClass, $mode='auto', $eol = PHP_EOL, $blockType='text')
+    private function insertEditableTag( $contentUid, $contentClass, $mode='auto', $blockType='text', $eol = PHP_EOL)
     {
+        if($mode == 'stop'){
+            return $eol.$this->remToCloseCurrentBlockWith.$eol;
+        }
+
         $class = $contentClass;
         $id    = $contentClass.'#'.$contentUid;
 
-        switch($blockType)
-        {
-            case 'text':
-            case 'image':
-                $openBlock = $this->{'open'.ucfirst($blockType).'Block'};
-                $stopBlock = $this->{'close'.ucfirst($blockType).'Block'};;
-                break;
-            default:
-                $openBlock = $this->openTextBlock;
-                $stopBlock = $this->closeTextBlock;
-        }
+        $stopBlock = $this->{'close'.ucfirst($blockType)};
+        $openBlock = $this->{'open'.ucfirst($blockType)};
+        $openBlock = strtr($openBlock, array(
+            '###id###' => $id,
+            '###class###' => $class
+        ));
 
         switch($mode){
 
             case 'start':
-                $mark = '<!-- ###'.$id.'### Start -->';
-                $this->plugin->setReplacement($mark,$openBlock);
-                return $eol.$mark.$eol;
-                break;
 
-            case 'stop':
-                $mark = '<!-- ###'.$class.'### Stop -->';
-                $this->plugin->setReplacement($mark,$stopBlock);
-                return $eol.$mark.$eol;
-                break;
+                $stopmark = '<!-- ###'.$class.'### Stop -->';
+                $this->plugin->setReplacement($stopmark,$stopBlock);
+                $this->remToCloseCurrentBlockWith = $stopmark;
+
+                $startmark = '<!-- ###'.$id.'### Start -->';
+                $this->plugin->setReplacement($startmark,$openBlock);
+                return $eol.$startmark.$eol;
 
             case 'wrap':
+
                 $id     = $contentClass;
                 $class  = $id;
+
             case 'auto':
             default:
+
                 $startmark = '<!-- ###'.$id.'### Start -->';
                 $stopmark  = '<!-- ###'.$class.'### Stop -->';
-                if($this->plugin->getReplacement($startmark)=='')
-                {
-                    $this->plugin->setReplacement($startmark,$openBlock);
-                    return $eol.$startmark.$eol;
-                }
-                elseif($this->plugin->getReplacement($stopmark)=='')
+
+                if($this->plugin->getReplacement($stopmark) === false)
                 {
                     $this->plugin->setReplacement($stopmark,$stopBlock);
-                    return $eol.$stopmark.$eol;
                 }
+
+                if( $this->plugin->getReplacement($startmark) === false )
+                {
+                    $this->plugin->setReplacement($startmark,$openBlock);
+                }
+                return $eol.$startmark.$eol.'%s'.$eol.$stopmark.$eol;
         }
     }
-
 } 

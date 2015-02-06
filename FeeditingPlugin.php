@@ -65,7 +65,7 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->page->setLoader(new \Herbie\Loader\PageLoader($this->alias));
         $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
 
-        $this->loadEditableSegments();
+        $segmentsFeedback = $this->loadEditableSegments();
 
         $_cmd = isset($_REQUEST['cmd']) ? $_REQUEST['cmd'] : '';
         switch($_cmd)
@@ -106,21 +106,9 @@ class FeeditingPlugin extends \Herbie\Plugin
                     }
                     else // deliver partial content for ajax-request
                     {
-//                      // 'placeholder' must match the actual segment-wrapper! ( see HerbieExtension::functionContent() )
-                        $editable_segment =
+                        $editable_segment = $this->editableContent[$currsegmentid]->getSegment();
 
-//                          // open wrap
-//                      $this->setEditableTag($currsegmentid, $currsegmentid, $placeholder=$this->config['contentSegment_WrapperPrefix'].$currsegmentid, 'wrap').
-
-                            // wrapped segment
-                        $this->editableContent[$currsegmentid]->getSegment().
-//
-                            // close wrap
-//                      .$this->setEditableTag($currsegmentid, $currsegmentid, $placeholder=$this->config['contentSegment_WrapperPrefix'].$currsegmentid, 'wrap')
-
-                        '';
-
-                        // render jeditable contents
+                        // render feeditable contents
                         $this->page->setSegments(array(
                             $currsegmentid => $this->renderEditableContent($currsegmentid, $editable_segment, $contenttype)
                         ));
@@ -133,7 +121,7 @@ class FeeditingPlugin extends \Herbie\Plugin
             case '':
 
                 foreach($this->segments as $id => $_segment){
-                    $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown');
+                    $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $segmentsFeedback=='twigify');
                 }
                 $this->page->setSegments($this->segments);
                 break;
@@ -199,7 +187,10 @@ class FeeditingPlugin extends \Herbie\Plugin
     }
 
     private function getReplacement($mark){
-        return $this->replace_pairs[$mark];
+        if(isset($this->replace_pairs[$mark]))
+            return $this->replace_pairs[$mark];
+        else
+            return false;
     }
 
     private function setReplacement($mark, $replacement){
@@ -236,6 +227,8 @@ class FeeditingPlugin extends \Herbie\Plugin
             $this->editableContent[$segmentid]->setContent($_staticContent);
             $this->segments[$segmentid] = $this->editableContent[$segmentid]->getSegment();
         };
+
+        return $this->editableContent[$segmentid]->getSegmentLoadedMsg();
     }
 
     /**
@@ -269,7 +262,7 @@ class FeeditingPlugin extends \Herbie\Plugin
         }
         else
         {
-            //$ret = strtr($content, $this->replace_pairs);
+            $content = strtr($content, $this->replace_pairs);
             $ret = strtr($content, array(PHP_EOL => ''));
         }
 
@@ -356,7 +349,7 @@ class FeeditingPlugin extends \Herbie\Plugin
     public function includeAfterBodyStarts($tagOrPath){
 
         $this->app['twig']->environment->setLoader(new Twig_Loader_String());
-        $twiggedBody = $this->app['twig']->environment->render('<body class="{{ bodyClass() }}">');
+        $twiggedBody = $this->app['twig']->environment->render('<body class="{{ bodyclass() }}">');
 
         $this->includeIntoTag($twiggedBody, $tagOrPath);
     }

@@ -25,17 +25,20 @@ class SirTrevorContent extends FeeditableContent {
         "headingBlock" => [
             "template" => '{"type":"heading","data":{"text":"%s"}},',
             "mdregex" => '/^#/',
-            "dataregex" => '/([^#].*)/'
+            "dataregex" => '/([^#].*)/',
+            "insert" => 'inline'
         ],
         "imageBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\!\[/',
-            "dataregex" => '/\((.*)\)/'
+            "dataregex" => '/\((.*)\)/',
+            "insert" => 'inline'
         ],
         "textBlock" => [
             "template" => '{"type":"text","data":{"text":"%s"}},',
             "mdregex" => '/.*/',
-            "dataregex" => '/.*/'
+            "dataregex" => '/.*/',
+            "insert" => 'inline'
         ],
     ];
     protected $contentContainer = '{"data":[%s{}]}';
@@ -108,8 +111,10 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getSegment($json_encode=true){
-        if($json_encode)
+        if($json_encode){
+            $this->segmentLoadedMsg = 'dontTwigify';
             return implode( $this->getEob(),  $this->getContent() );
+        }
         else
             return implode( $this->getContent($json_decode=true) );
     }

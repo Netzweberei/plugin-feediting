@@ -28,17 +28,16 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     protected $editableContent = [];
 
+    protected $session;
+
     private $editor = 'Feeditable';
 
-    protected $session;
+    private $status;
 
     public function __construct(\Herbie\Application $app)
     {
         parent::__construct($app);
 
-        // TODO: Implement some kind of authentication!
-        //$this->session = new Session();
-        //$this->session->start();
         $this->authenticated = $this->isAuthenticated();
 
         // set defaults
@@ -65,26 +64,31 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->page->setLoader(new \Herbie\Loader\PageLoader($this->alias));
         $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
 
-        $segmentsFeedback = $this->loadEditableSegments();
+        $this->status = 'loading';
 
-        $_cmd = isset($_REQUEST['cmd']) ? $_REQUEST['cmd'] : '';
+        $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
+        $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
+        $_cmd       = ( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))) ?
+            $this->editableContent[$_segmentid]->{$_REQUEST['cmd']}() : '';
+
         switch($_cmd)
         {
             case 'save':
 
                 if( isset($_POST['id']) )
                 {
-                    /* get $elemid, $currsegmentid(!) and $contenttype */
-                    extract($this->collectChanges());
+                    $this->status = 'saving';
 
-                    if( $currsegmentid !== false )
+                    $changed = $this->collectChanges();
+
+                    if( $changed['segmentid'] !== false )
                     {
                         $fheader = $this->getContentfileHeader();
                         $fh = fopen($this->path, 'w');
                         fputs($fh, $fheader);
                         foreach($this->segments as $segmentid => $_staticContent){
-                            if( $segmentid > 0 ) {
-                                fputs($fh, "--- {$segmentid} ---".PHP_EOL);
+                            if( $segmentid != '0' ) {
+                                fputs($fh, PHP_EOL."--- {$segmentid} ---".PHP_EOL);
                             }
                             $_modifiedContent[$segmentid] = $this->renderRawContent($this->editableContent[$segmentid]->getSegment(false), $this->editableContent[$segmentid]->getFormat(), true );
                             fputs($fh, $_modifiedContent[$segmentid]);
@@ -92,43 +96,40 @@ class FeeditingPlugin extends \Herbie\Plugin
                         fclose($fh);
                     }
 
-                    // reload contents after saving
-                    $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
+                    $this->status = 'reloading';
 
-                    if($this->editableContent[$currsegmentid]->reloadPageAfterSave === true)
+                    $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
+                    $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
+
+                    if($this->editableContent[$changed['segmentid']]->reloadPageAfterSave === true)
                     {
-                        $this->loadEditableSegments();
                         foreach($this->segments as $id => $_segment){
-                            $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown');
+                            $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
                         }
                         $this->page->setSegments($this->segments);
                         break;
                     }
                     else // deliver partial content for ajax-request
                     {
-                        $editable_segment = $this->editableContent[$currsegmentid]->getSegment();
+                        $editable_segment = $this->editableContent[$changed['segmentid']]->getSegment();
 
                         // render feeditable contents
                         $this->page->setSegments(array(
-                            $currsegmentid => $this->renderEditableContent($currsegmentid, $editable_segment, $contenttype)
+                            $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
                         ));
 
-                        die($this->app->renderContentSegment($currsegmentid));
+                        die($this->app->renderContentSegment($changed['segmentid']));
                     }
                 }
                 break;
 
-            case '':
+            default:
 
                 foreach($this->segments as $id => $_segment){
-                    $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $segmentsFeedback=='twigify');
+                    $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
                 }
                 $this->page->setSegments($this->segments);
                 break;
-
-            default:
-
-                $this->editableContent[0]->{$_cmd}();
         }
     }
 
@@ -156,34 +157,38 @@ class FeeditingPlugin extends \Herbie\Plugin
         ));
     }
 
-    private function includeIntoTag($closingtag=null, $tagOrPath)
+    private function includeIntoTag($tag=null, $tagOrPath)
     {
-        if(empty($closingtag)) return;
+        if(empty($tag)) return;
 
-        if(!isset($this->replace_pairs[$closingtag]))
-            $this->replace_pairs[$closingtag] = $closingtag;
+        if(!isset($this->replace_pairs[$tag]))
+            $this->replace_pairs[$tag] = $tag;
 
-        $debug = substr( $tagOrPath, 0, 1 );
-        if($debug == '<'){
-            $this->replace_pairs[$closingtag] = $tagOrPath.PHP_EOL.$this->replace_pairs[$closingtag];
+        if(substr( $tagOrPath, 0, 1 ) == '<'){
+            // include a tag:
+            if(substr( $tagOrPath, 0, 2 ) == '</')
+                $this->replace_pairs[$tag] = $tagOrPath.PHP_EOL.$this->replace_pairs[$tag];
+            else
+                $this->replace_pairs[$tag] = $this->replace_pairs[$tag].PHP_EOL.$tagOrPath.PHP_EOL;
             return;
+        } else {
+            // include a path:
+            $abspath = $this->alias->get('@plugin');
+            $dirname = strtr(dirname($tagOrPath), array($abspath => ''));
+            $filename = basename($tagOrPath);
+            $fileAtoms = explode('.',basename($filename));
+            switch(end($fileAtoms)){
+                case 'css':
+                    $tmpl = '<link rel="stylesheet" href="%s" type="text/css" media="screen" title="no title" charset="utf-8">';
+                    break;
+                case 'js':
+                    $tmpl = '<script src="%s" type="text/javascript" charset="utf-8"></script>';
+                    break;
+                default:
+                    return;
+            }
         }
-
-        $abspath = $this->alias->get('@plugin');
-        $dirname = strtr(dirname($tagOrPath), array($abspath => ''));
-        $filename = basename($tagOrPath);
-        $fileAtoms = explode('.',basename($filename));
-        switch(end($fileAtoms)){
-            case 'css':
-                $tmpl = '<link rel="stylesheet" href="%s" type="text/css" media="screen" title="no title" charset="utf-8">';
-                break;
-            case 'js':
-                $tmpl = '<script src="%s" type="text/javascript" charset="utf-8"></script>';
-                break;
-            default:
-                return;
-        }
-        $this->replace_pairs[$closingtag] = sprintf($tmpl, '/assets'.$dirname.DIRECTORY_SEPARATOR.$filename).PHP_EOL.$this->replace_pairs[$closingtag];
+        $this->replace_pairs[$tag] = sprintf($tmpl, '/assets'.$dirname.DIRECTORY_SEPARATOR.$filename).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     private function getReplacement($mark){
@@ -248,10 +253,10 @@ class FeeditingPlugin extends \Herbie\Plugin
      * @param string $format, eg. 'markdown'
      * @return string
      */
-    private function renderEditableContent( $contentId, $content, $format, $twigged=false )
+    private function renderEditableContent( $contentId, $content, $format, $twigify=false )
     {
-        if($twigged)
-        {
+        if($twigify) {
+
             $herbieLoader = $this->app['twig']->environment->getLoader();
             $this->app['twig']->environment->setLoader(new Twig_Loader_String());
             $twigged = $this->app['twig']->environment->render(strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL )));
@@ -311,10 +316,10 @@ class FeeditingPlugin extends \Herbie\Plugin
             return false;
         }
 
-        /* get $elemid, $currsegmentid(!) and $contenttype */
-        extract($this->editableContent[0]->decodeEditableId($_POST['id']));
+        $posted = $this->editableContent[0]->decodeEditableId($_POST['id']);
+        $this->replace_pairs = [];
 
-        if($this->editableContent[$currsegmentid]->collectAllChanges === true)
+        if($this->editableContent[$posted['segmentid']]->collectAllChanges === true)
         {
             foreach($this->editableContent as $_segmentid => $_segmentcontent)
             {
@@ -326,15 +331,15 @@ class FeeditingPlugin extends \Herbie\Plugin
         }
         else
         {
-            if(!$this->editableContent[$currsegmentid]->setContentBlockById($elemid, (string) $_POST[$elemid])){
+            if(!$this->editableContent[$posted['segmentid']]->setContentBlockById($posted['elemid'], (string) $_POST['value'])){
                 return false;
             }
         }
 
         return array(
-            'elemid'        => $elemid,
-            'currsegmentid' => $currsegmentid,
-            '$contenttype'  => $contenttype
+            'elemid'        => $posted['elemid'],
+            'segmentid'     => $posted['segmentid'],
+            'contenttype'   => $posted['contenttype']
         );
     }
 
@@ -362,6 +367,9 @@ class FeeditingPlugin extends \Herbie\Plugin
     public function __get($attrib){
         switch($attrib){
             case 'path':
+            case 'status':
+            case 'replace_pairs':
+            case 'remove_pairs':
                 return $this->{$attrib};
                 break;
             default:

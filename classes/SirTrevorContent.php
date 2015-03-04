@@ -34,6 +34,13 @@ class SirTrevorContent extends FeeditableContent {
             "dataregex" => '/\((.*)\)/',
             "insert" => 'inline'
         ],
+        // @TODO: Define custom-imagine-block for ST
+        "imagineBlock" => [
+            "template" => '{"type":"image","data":{"file":{"url":"media/%s"}}},',
+            "mdregex" => '/^\<img/',
+            "dataregex" => '/\'([a-zA-Z\.0-9\-\_]*)\'/',
+            "insert" => 'inline'
+        ],
         "textBlock" => [
             "template" => '{"type":"text","data":{"text":"%s"}},',
             "mdregex" => '/.*/',
@@ -41,7 +48,14 @@ class SirTrevorContent extends FeeditableContent {
             "insert" => 'inline'
         ],
     ];
+
     protected $contentContainer = '{"data":[%s{}]}';
+
+    protected $segmentLoadedMsg = '';
+
+    public function save(){
+        return 'save';
+    }
 
     public function getEditablesCssConfig($path=null){
         $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor.css');
@@ -50,8 +64,8 @@ class SirTrevorContent extends FeeditableContent {
 
     public function getEditablesJsConfig( $path=null )
     {
-        $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
         $this->plugin->includeAfterBodyStarts('<form method="post">');
+        $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
         $this->plugin->includeBeforeBodyEnds('</form>');
 
         foreach($this->plugin->segments as $segmentid => $segment)
@@ -105,14 +119,13 @@ class SirTrevorContent extends FeeditableContent {
 
         return array(
             'elemid' => $elemId,
-            'currsegmentid' => $currsegmentid,
+            'segmentid'     => $currsegmentid,
             'contenttype' => 'sirtrevor'
         );
     }
 
     public function getSegment($json_encode=true){
         if($json_encode){
-            $this->segmentLoadedMsg = 'dontTwigify';
             return implode( $this->getEob(),  $this->getContent() );
         }
         else
@@ -130,7 +143,18 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getContentBlockById($id){
-        return $this->blocks ? sprintf($this->contentContainer, implode($this->blocks)) : null;
+        $ret = null;
+        if($this->blocks){
+            $html       = implode($this->blocks);
+            $oneline    = strtr($html, array(
+                PHP_EOL => '',
+                '\\n'   => '',
+                '\\'    => '',
+            ));
+            $json       = strtr($oneline, $this->plugin->replace_pairs);
+            $ret        = sprintf($this->contentContainer, $json);
+        }
+        return $ret;
     }
 
     public function setContentBlockById($id, $json){
@@ -152,10 +176,7 @@ class SirTrevorContent extends FeeditableContent {
     private function json2array($json){
 
         $blocks = array();
-        $content = json_decode(strtr($json, array(
-            '\\n' => '',
-            '\\' => '',
-        )));
+        $content = json_decode($json);
         if(isset($content->data))
         {
             foreach($content->data as $_block)
@@ -169,7 +190,7 @@ class SirTrevorContent extends FeeditableContent {
                             $blocks[] = '!['.basename($_block->data->file->url).']('.$_block->data->file->url.')'.PHP_EOL;
                             break;
                         case 'heading':
-                            $blocks[] = '#'.strtr($_block->data->text, array(PHP_EOL => '')).PHP_EOL;
+                            $blocks[] = '#'.strtr(trim($_block->data->text), array(PHP_EOL => '')).PHP_EOL;
                             break;
                         case 'text':
                         default:

@@ -42,9 +42,9 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->authenticated = $this->isAuthenticated();
 
         // set defaults
-        $this->config['contentSegment_WrapperPrefix'] = 'placeholder-';
-        $this->config['editable_prefix'] = 'editable_';
-        $this->config['contentBlockDimension'] = 100;
+        $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'placeholder-');
+        $this->config->set('plugins.config.feediting.editable_prefix', 'editable_');
+        $this->config->set('plugins.config.feediting.contentBlockDimension', 100);
 
         // set editor
         $this->editor = 'SirTrevor';
@@ -339,7 +339,8 @@ class FeeditingPlugin extends \Herbie\Plugin
     }
 
     public function getConfig(){
-        return $this->config;
+        $config = $this->config->toArray();
+        return $config['plugins']['config']['feediting'];
     }
 
     public function includeIntoHeader($tagOrPath){

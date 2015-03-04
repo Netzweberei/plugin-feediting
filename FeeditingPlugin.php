@@ -264,9 +264,9 @@ class FeeditingPlugin extends \Herbie\Plugin
 
             $formatter = \Herbie\Formatter\FormatterFactory::create($format);
             $ret = strtr($formatter->transform($twigged), $this->replace_pairs);
-        }
-        else
-        {
+
+        } else {
+
             $content = strtr($content, $this->replace_pairs);
             $ret = strtr($content, array(PHP_EOL => ''));
         }

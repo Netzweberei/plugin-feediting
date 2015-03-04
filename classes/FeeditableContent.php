@@ -101,11 +101,12 @@ class FeeditableContent {
 
     public function getSegment($eob=true){
         if($eob){
-            $this->segmentLoadedMsg = 'twigify';
             return implode( $this->getEob(),  $this->getContent() );
         }
-        else
+        else {
+            $this->segmentLoadedMsg = '';
             return implode( $this->getContent() );
+        }
     }
 
     /**
@@ -156,39 +157,27 @@ class FeeditableContent {
             return $this->pluginConfig['editable_prefix'].$this->format.'-'.$this->segmentid.'#'.$elemId;
     }
 
-    public function decodeEditableId($elemId)
+    public function decodeEditableId($elemuri)
     {
-        list($contenturi, $elemid)      = explode('#', str_replace($this->config['editable_prefix'], '', $elemId));
-        list($contenttype, $contentkey) = explode('-', $contenturi);
-        $currsegmentid                  = $elemid % $this->config['contentBlockDimension'];
+        list($contenturi, $elemid)      = explode('#', str_replace($this->pluginConfig['editable_prefix'], '', $elemuri));
+        list($contenttype, $currsegmentid) = explode('-', $contenturi);
 
         return array(
-            'elemid' => $elemId,
-            'currsegmentid' => $currsegmentid,
-            'contenttype' => $contenttype
+            'elemid' => $elemid,
+            'segmentid' => $currsegmentid,
+            'contenttype' => $contenttype ? $contenttype : $this->format
         );
     }
 
     public function getEditablesCssConfig($path=null){}
 
-    public function getEditablesJsConfig( $path=null )
-    {
-        foreach($this->plugin->segments as $segmentid => $segment)
-        {
-            $this->plugin->includeBeforeBodyEnds(
-'<script type="text/javascript" charset="utf-8">'.
-''.
-'</script>'
-            );
-        }
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
-    }
+    public function getEditablesJsConfig( $path=null ){}
 
     public function getEditableContainer($contentId, $content){
         return '<form method="post" name="$contentId">'.$content.'</form>';
     }
 
-    private function identifyMarkdownBlocks( $content, $dimensionOffset = 0 )
+    protected function identifyMarkdownBlocks( $content, $dimensionOffset = 0 )
     {
         $ret        = [];
         $eol        = PHP_EOL;
@@ -211,26 +200,31 @@ class FeeditableContent {
                     foreach($this->contentBlocks as $b_type => $b_def )
                     {
                         // look for special content which need its own block
-                        if( $b_type != 'textBlock' && preg_match($b_def['mdregex'], $line, $test)){
-
-                            if($blockId) {
-                                // if a "normal" block of multiple lines is still open, we close it
+                        if( $b_type != 'textBlock' && preg_match($b_def['mdregex'], $line, $test))
+                        {
+                            // if a "normal" block of multiple lines is still open, we close it
+                            if($blockId)
+                            {
                                 $ret[$blockId+1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'stop', $b_type, MARKDOWN_EOL);
                                 $blockId = 0;
                                 $openBlock = true;
                             }
 
-                            if($b_def['template'] !== ''){
-                                // build block
+                            if($b_def['template'] !== '')
+                            {
+                                // build special block
                                 preg_match($b_def['dataregex'], $line, $b_data);
-                                switch($b_def['insert']){
+                                switch($b_def['insert'])
+                                {
                                     case 'inline':
-                                        $ret[$lineno] = sprintf($this->insertEditableTag($blockId, $class, 'auto', $b_type, MARKDOWN_EOL), end($b_data));
+                                        $ret[$lineno] = sprintf($this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL), end($b_data));
                                         break;
+
                                     case 'array':
-                                        $ret[$lineno-1] = $this->insertEditableTag($blockId, $class, 'start', $b_type, MARKDOWN_EOL);
+                                        $ret[$lineno-1] = $this->insertEditableTag($lineno, $class, 'start', $b_type, MARKDOWN_EOL);
                                         $ret[$lineno] = end($b_data);
-                                        $ret[$lineno+1] = $this->insertEditableTag($blockId, $class, 'stop', $b_type, MARKDOWN_EOL);
+                                        $ret[$lineno+1] = $this->insertEditableTag($lineno, $class, 'stop', $b_type, MARKDOWN_EOL);
+                                        break;
                                 }
                             } else {
                                 // don't build an editable block, eg. bootstrap-markdown's
@@ -245,7 +239,7 @@ class FeeditableContent {
                     {
                         $blockId = $lineno;
                         $ret[$blockId-1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'start', 'textBlock', MARKDOWN_EOL);
-                        $ret[$blockId] = $line;
+                        $ret[$blockId] = $line.$eol;
                         $openBlock = false;
                     }
                     else
@@ -300,7 +294,7 @@ class FeeditableContent {
     private function insertEditableTag( $contentUid, $contentClass, $mode='auto', $blockType='text', $eol = PHP_EOL)
     {
         if($mode == 'stop'){
-            return $eol.$this->remToCloseCurrentBlockWith.$eol;
+            return $eol.$this->remToCloseCurrentBlockWith.$eol.PHP_EOL;
         }
 
         $class = $contentClass;
@@ -334,18 +328,15 @@ class FeeditableContent {
             default:
 
                 $startmark = '<!-- ###'.$id.'### Start -->';
-                $stopmark  = '<!-- ###'.$class.'### Stop -->';
+                $stopmark  = '<!-- ###'.$blockType.'### Stop -->';
 
-                if($this->plugin->getReplacement($stopmark) === false)
-                {
+                //if( $this->plugin->getReplacement($stopmark) === false)
                     $this->plugin->setReplacement($stopmark,$stopBlock);
-                }
 
-                if( $this->plugin->getReplacement($startmark) === false )
-                {
+                //if( $this->plugin->getReplacement($startmark) === false )
                     $this->plugin->setReplacement($startmark,$openBlock);
-                }
-                return $eol.$startmark.$eol.'%s'.$eol.$stopmark.$eol;
+
+                return $eol.$startmark.$eol.'%s'.$eol.$stopmark.$eol.PHP_EOL;
         }
     }
 } 

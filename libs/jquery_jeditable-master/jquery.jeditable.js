@@ -349,7 +349,6 @@
                                                   $(ajaxoptions.container ).replaceWith(result);
                                               else
                                                 $(self).replaceWith(result);
-                                              makeJeditable();
                                           }
                                           else
                                               $(self).html(result);

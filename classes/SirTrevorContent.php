@@ -118,9 +118,9 @@ class SirTrevorContent extends FeeditableContent {
         list($contenttype, $currsegmentid) = explode('-', $elemId);
 
         return array(
-            'elemid' => $elemId,
+            'elemid'        => $elemId,
             'segmentid'     => $currsegmentid,
-            'contenttype' => 'sirtrevor'
+            'contenttype'   => 'sirtrevor'
         );
     }
 

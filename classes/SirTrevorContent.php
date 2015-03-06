@@ -70,7 +70,6 @@ class SirTrevorContent extends FeeditableContent {
 
         foreach($this->plugin->segments as $segmentid => $segment)
         {
-            //$this->plugin->includeAfterBodyStarts('<input type="submit" name="id" value="sirtrevor-'.$segmentid.'">');
             $this->plugin->includeBeforeBodyEnds(
 '<script type="text/javascript" charset="utf-8">'.
 '

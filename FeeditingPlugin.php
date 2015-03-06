@@ -164,31 +164,46 @@ class FeeditingPlugin extends \Herbie\Plugin
         if(!isset($this->replace_pairs[$tag]))
             $this->replace_pairs[$tag] = $tag;
 
-        if(substr( $tagOrPath, 0, 1 ) == '<'){
+        if(substr( $tagOrPath, 0, 1 ) == '<')
+        {
             // include a tag:
             if(substr( $tagOrPath, 0, 2 ) == '</')
                 $this->replace_pairs[$tag] = $tagOrPath.PHP_EOL.$this->replace_pairs[$tag];
             else
                 $this->replace_pairs[$tag] = $this->replace_pairs[$tag].PHP_EOL.$tagOrPath.PHP_EOL;
+
             return;
-        } else {
+        }
+        else
+        {
             // include a path:
-            $abspath = $this->alias->get('@plugin');
-            $dirname = strtr(dirname($tagOrPath), array($abspath => ''));
-            $filename = basename($tagOrPath);
-            $fileAtoms = explode('.',basename($filename));
-            switch(end($fileAtoms)){
+            $abspath    = $this->alias->get('@plugin');
+            $dirname    = strtr(dirname($tagOrPath), array($abspath => ''));
+            $filename   = basename($tagOrPath);
+            $fileAtoms  = explode('.',basename($filename));
+            if( strpos($dirname, '://') > 1 ) {
+                $ref = 'src';
+                $pathPrefix = '';
+            } else {
+                $ref = 'src';
+                $pathPrefix = DIRECTORY_SEPARATOR.'assets';
+            }
+
+            switch(end($fileAtoms))
+            {
                 case 'css':
                     $tmpl = '<link rel="stylesheet" href="%s" type="text/css" media="screen" title="no title" charset="utf-8">';
                     break;
+
                 case 'js':
-                    $tmpl = '<script src="%s" type="text/javascript" charset="utf-8"></script>';
+                    $tmpl = '<script '.$ref.'="%s" type="text/javascript" charset="utf-8"></script>';
                     break;
+
                 default:
                     return;
             }
         }
-        $this->replace_pairs[$tag] = sprintf($tmpl, '/assets'.$dirname.DIRECTORY_SEPARATOR.$filename).PHP_EOL.$this->replace_pairs[$tag];
+        $this->replace_pairs[$tag] = sprintf($tmpl, $pathPrefix.$dirname.DIRECTORY_SEPARATOR.$filename).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     private function getReplacement($mark){

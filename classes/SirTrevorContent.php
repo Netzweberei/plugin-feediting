@@ -25,7 +25,7 @@ class SirTrevorContent extends FeeditableContent {
         "headingBlock" => [
             "template" => '{"type":"heading","data":{"text":"%s"}},',
             "mdregex" => '/^#/',
-            "dataregex" => '/([^#].*)/',
+            "dataregex" => '/(.*)/',
             "insert" => 'inline'
         ],
         "imageBlock" => [
@@ -193,7 +193,11 @@ class SirTrevorContent extends FeeditableContent {
                             $blocks[] = '!['.basename($_block->data->file->url).']('.$_block->data->file->url.')'.PHP_EOL;
                             break;
                         case 'heading':
-                            $blocks[] = '#'.strtr(trim($_block->data->text), array(PHP_EOL => '')).PHP_EOL;
+                            $test = strtr(trim($_block->data->text), array(PHP_EOL => '')).PHP_EOL;
+                            if(substr($test, 0, 1)!=='#'){
+                                $test = '#'.$test;
+                            }
+                            $blocks[] = $test;
                             break;
                         case 'text':
                         default:

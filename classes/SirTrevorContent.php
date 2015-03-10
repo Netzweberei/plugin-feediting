@@ -136,7 +136,11 @@ class SirTrevorContent extends FeeditableContent {
         if($json_decode){
             $ret = $this->json2array($this->getContentBlockById($this->segmentid));
         } else {
-            $ret = $this->blocks;
+            foreach($this->blocks as $k => $v){
+                $ret[$k] = strtr($v, array(
+                    '"' => '\"'
+                ));
+            }
         }
         return $ret;
     }
@@ -150,7 +154,7 @@ class SirTrevorContent extends FeeditableContent {
                 '\\n'   => '',
                 '\\'    => '',
             ));
-            $json       = strtr($oneline, $this->plugin->replace_pairs);
+            $json       = strtr($oneline, array_merge(array('"'=>'\"'), $this->plugin->replace_pairs));
             $ret        = sprintf($this->contentContainer, $json);
         }
         return $ret;

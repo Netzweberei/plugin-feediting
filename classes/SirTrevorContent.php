@@ -28,6 +28,12 @@ class SirTrevorContent extends FeeditableContent {
             "dataregex" => '/(.*)/',
             "insert" => 'inline'
         ],
+        "widgetBlock" => [
+            "template" => '{"type":"widget","data":{"widgets":["box1","box2"],"selected":"%s"}},',
+            "mdregex" => '/^\{\{\s?widget/',
+            "dataregex" => '/\([\'\"]{1}(.*)[\'\"]{1}\)/',
+            "insert" => 'inline'
+        ],
         "imageBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\!\[/',
@@ -58,8 +64,9 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getEditablesCssConfig($path=null){
-        $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor.css');
+        $this->plugin->includeIntoHeader($path.'libs/jquery_fancybox/jquery.fancybox.css');
         $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor-icons.css');
+        $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor.css');
     }
 
     public function getEditablesJsConfig( $path=null )
@@ -82,7 +89,8 @@ class SirTrevorContent extends FeeditableContent {
           "Quote",
           "Image",
           "Video",
-          //"Tweet"
+          "Tweet",
+          "Widget"
         ],
         defaultType: "Text"
       });
@@ -93,6 +101,7 @@ class SirTrevorContent extends FeeditableContent {
 '</script>'
             );
         }
+        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_fancybox/jquery.fancybox.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/locales/de.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/sir-trevor.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/Eventable/eventable.js');
@@ -176,6 +185,12 @@ class SirTrevorContent extends FeeditableContent {
         return false;
     }
 
+    public function getWidgetByName(){
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        $widgetsExtension->renderWidget($_REQUEST['name'], $fireEvents=true);
+        return $_cmd = 'bypass';
+    }
+
     private function json2array($json){
 
         $blocks = array();
@@ -189,6 +204,9 @@ class SirTrevorContent extends FeeditableContent {
                 {
                     switch($_block->type)
                     {
+                        case 'widget':
+                            $blocks[] = '{{widget(\''.basename($_block->data->selected).'\')}}'.PHP_EOL;
+                            break;
                         case 'image':
                             $blocks[] = '!['.basename($_block->data->file->url).']('.$_block->data->file->url.')'.PHP_EOL;
                             break;

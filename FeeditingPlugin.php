@@ -32,7 +32,7 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     private $editor = 'Feeditable';
 
-    private $status;
+    private $cmd;
 
     public function __construct(\Herbie\Application $app)
     {
@@ -64,43 +64,61 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->page->setLoader(new \Herbie\Loader\PageLoader($this->alias));
         $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
 
-        $this->status = 'loading';
+        $this->cmd = @$_REQUEST['cmd'];
 
         $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
         $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
-        $_cmd       = ( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))) ?
-            $this->editableContent[$_segmentid]->{$_REQUEST['cmd']}() : '';
+        if( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))){
+            $this->cmd = $this->editableContent[$_segmentid]->{$this->cmd}();
+        }
 
-        $this->editPage($_cmd, $_twigify);
+        $this->editPage($_twigify);
     }
 
     protected function onWidgetLoaded(\Herbie\Event $event ){
 
-        switch(@$_REQUEST['cmd']){
-            case 'getWidgetByName':
-                $_REQUEST['cmd'] = 'renderWidgetAndStop';
+        switch($this->cmd)
+        {
+            case 'saveWidget':
 
-                $pageLoader = $event->offsetGet('pageLoader');
+                // Load widget's specific layout
                 $widgetTemplateDir = $event->offsetGet('widgetTemplateDir');
-
+                $pageLoader = $event->offsetGet('pageLoader');
                 $pageLoader->addPath($widgetTemplateDir);
-                $this->editWidget($event);
 
-                break;
-            default:
-                return;
+                $this->cmd = 'saveAndReturn';
+                $this->editableContent = [];
+                $this->editWidget($event);
+                // Reload changed content
+                $this->page->load($this->path);
+
+            case 'getWidgetByName':
+
+                // Load widget's specific layout
+                $widgetTemplateDir = $event->offsetGet('widgetTemplateDir');
+                $pageLoader = $event->offsetGet('pageLoader');
+                $pageLoader->addPath($widgetTemplateDir);
+
+                $this->cmd = 'editWidget';
+                $this->editWidget($event);
         }
     }
 
     protected function onWidgetGenerated(\Herbie\Event $event ){
 
-        switch(@$_REQUEST['cmd']){
-            case 'renderWidgetAndStop':
-                $_REQUEST['cmd'] = '';
+        switch($this->cmd)
+        {
+            case 'editWidget':
+
                 $widgetData = $event->offsetGet('widgetData');
-                $this->app['menuItem']->setData(['layout'=>'index.html']);
+                $this->cmd = 'renderWidget';
+
+                // Widget's main template 'index.html' is included into feediting.html
+                $this->app['menuItem']->setData(['layout'=>'feediting.html']);
                 $this->app['page']->setData($widgetData['data']);
                 $this->app['page']->setSegments($widgetData['segments']);
+
+
             default:
                 return;
         }
@@ -111,31 +129,25 @@ class FeeditingPlugin extends \Herbie\Plugin
         // Disable Caching while editing
         $this->app['twig']->environment->setCache(false);
 
+        $this->page  = $this->app['page'];
         $this->alias = $this->app['alias'];
-
-        $this->path = $event->offsetGet('widgetPath');
-        $this->page = $this->app['page'];
-
-        $this->status = 'loading';
+        $this->path  = $this->alias->get($event->offsetGet('widgetPath'));
 
         $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
         $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
-        $_cmd       = ( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))) ?
-            $this->editableContent[$_segmentid]->{$_REQUEST['cmd']}() : '';
 
-        $this->editPage($_cmd, $_twigify);
+        $this->editPage($_twigify);
     }
 
-    private function editPage($_cmd=null, $_twigify=false){
+    private function editPage($_twigify=false){
 
-        switch($_cmd)
+        switch($this->cmd)
         {
             case 'save':
+            case 'saveAndReturn':
 
                 if( isset($_POST['id']) )
                 {
-                    $this->status = 'saving';
-
                     $changed = $this->collectChanges();
 
                     if( $changed['segmentid'] !== false )
@@ -153,7 +165,8 @@ class FeeditingPlugin extends \Herbie\Plugin
                         fclose($fh);
                     }
 
-                    $this->status = 'reloading';
+                    if($this->cmd == 'saveAndReturn') return;
+                    $this->cmd == 'reload';
 
                     $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
                     $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
@@ -442,7 +455,7 @@ class FeeditingPlugin extends \Herbie\Plugin
         switch($attrib){
             case 'app':
             case 'path':
-            case 'status':
+            case 'cmd':
             case 'replace_pairs':
             case 'remove_pairs':
                 return $this->{$attrib};

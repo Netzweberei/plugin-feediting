@@ -109,11 +109,20 @@ class SirTrevorContent extends FeeditableContent {
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
     }
 
-    public function getEditableContainer($contentId, $content){
-        return
-            (($contentId == 0) ? '<div class="st-submit"><input type="submit" value="click to save changes" class="top" ><input type="hidden" name="id" value="sirtrevor-'.$contentId.'" ></input></div>': '').
-            '<textarea name="sirtrevor-'.$contentId.'" class="sirtrevor-'.$contentId.'">'.sprintf($this->contentContainer, $content).'</textarea>'.
-            '';
+    public function getEditableContainer($contentId, $content)
+    {
+        $ret = '';
+
+        if($contentId == 0) {
+            $ret .= '<div class="st-submit"><input type="submit" value="click to save changes" class="top" ><input type="hidden" name="id" value="sirtrevor-'.$contentId.'" ></input></div>';
+        }
+        if($this->plugin->cmd == 'editWidget'){
+            $ret .= '<input type="hidden" name="cmd" value="saveWidget" />';
+            $ret .= '<input type="hidden" name="name" value="'.$_REQUEST['name'].'" />';
+        }
+        $ret .= '<textarea name="sirtrevor-'.$contentId.'" class="sirtrevor-'.$contentId.'">'.sprintf($this->contentContainer, $content).'</textarea>';
+
+        return $ret;
     }
 
     public function encodeEditableId($elemId)
@@ -186,6 +195,12 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getWidgetByName(){
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        $widgetsExtension->renderWidget($_REQUEST['name'], $fireEvents=true);
+        return $_cmd = 'bypass';
+    }
+
+    public function saveWidget(){
         $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
         $widgetsExtension->renderWidget($_REQUEST['name'], $fireEvents=true);
         return $_cmd = 'bypass';

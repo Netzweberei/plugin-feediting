@@ -47,7 +47,7 @@ class JeditableContent extends FeeditableContent {
 
     public function getEditableContainer($contentId, $content){
 
-        if($this->plugin->status == 'reloading' && !$this->reloadPageAfterSave){
+        if($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave){
             return
                 '<div class="'.$this->pluginConfig['contentSegment_WrapperPrefix'].$contentId.'">
                 '.

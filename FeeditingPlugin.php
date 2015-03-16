@@ -46,7 +46,16 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->config->set('plugins.config.feediting.contentBlockDimension', 100);
 
         // set editor
-        $this->editor = 'SirTrevor';
+        switch($this->config->get('plugins.config.feediting.editor')){
+            case 'Htmlforms':
+                $this->editor = 'Feeditable';
+                break;
+            case 'SirTrevor':
+                $this->editor = 'SirTrevor';
+                break;
+            default:
+                $this->editor = 'Jeditable';
+        }
 
     }
 

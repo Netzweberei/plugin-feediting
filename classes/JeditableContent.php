@@ -15,6 +15,8 @@ use herbie\plugin\feediting\FeeditingPlugin;
 
 class JeditableContent extends FeeditableContent {
 
+    public $reloadPageAfterSave = false;
+
     protected $contentBlocks = [
         "headingBlock" => [
             "template" => '<div class="###class###" id="###id###">%s</div>',

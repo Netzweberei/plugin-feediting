@@ -17,7 +17,7 @@ class FeeditableContent {
 
     public $collectAllChanges = false;
 
-    public $reloadPageAfterSave = false;
+    public $reloadPageAfterSave = true;
 
     public $editableEmptySegmentContent = "\nclick to edit\n";
 
@@ -39,7 +39,7 @@ class FeeditableContent {
 
     protected $contentBlocks = [
         "textBlock" => [
-            "template" => '<textarea name="###id###">%s</textarea><input type="submit" name="cmd" value="save"/>',
+            "template" => '<input type="hidden" name="id" value="###id###"/><textarea name="value">%s</textarea><input type="submit" name="cmd" value="save"/>',
             "mdregex" => '/.*/',
             "dataregex" => '/.*/',
             "insert" => 'array'
@@ -173,8 +173,8 @@ class FeeditableContent {
 
     public function getEditablesJsConfig( $path=null ){}
 
-    public function getEditableContainer($contentId, $content){
-        return '<form method="post" name="$contentId">'.$content.'</form>';
+    public function getEditableContainer($segmentId, $content){
+        return '<form method="post" segmentid="'.$segmentId.'">'.$content.'</form>';
     }
 
     protected function identifyMarkdownBlocks( $content, $dimensionOffset = 0 )

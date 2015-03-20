@@ -29,7 +29,7 @@ class SirTrevorContent extends FeeditableContent {
             "insert" => 'inline'
         ],
         "widgetBlock" => [
-            "template" => '{"type":"widget","data":{"widgets":["box1","box2"],"selected":"%s"}},',
+            "template" => '{"type":"widget","data":{"selected":"%s"}},',
             "mdregex" => '/^\{\{\s?widget/',
             "dataregex" => '/\([\'\"]{1}(.*)[\'\"]{1}\)/',
             "insert" => 'inline'
@@ -85,11 +85,11 @@ class SirTrevorContent extends FeeditableContent {
         blockTypes: [
           "Text",
           "Heading",
-          "List",
-          "Quote",
+//          "List",
+//          "Quote",
           "Image",
           "Video",
-          "Tweet",
+//          "Tweet",
           "Widget"
         ],
         defaultType: "Text"
@@ -150,7 +150,7 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getContent($json_decode=false){
-
+        $ret = [];
         if($json_decode){
             $ret = $this->json2array($this->getContentBlockById($this->segmentid));
         } else {
@@ -257,6 +257,23 @@ class SirTrevorContent extends FeeditableContent {
                 die($sirtrevor);
             }
         }
+    }
+
+    public function loadAvailableWidgets(){
+        die('{"type": "widget", "data": {"available": [
+            {
+                "name": "box1",
+                "icon": "box",
+                "type": "box",
+                "uri": "_box1"
+            },
+            {
+                "name": "box2",
+                "icon": "widget",
+                "type": "box",
+                "uri": "_box2"
+            }
+        ]}}');
     }
 
 } 

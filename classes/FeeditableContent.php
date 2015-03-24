@@ -46,6 +46,8 @@ class FeeditableContent {
         ]
     ];
 
+    protected $tmplstrSeparator = '%s';
+
     protected $remToCloseCurrentBlockWith = '';
     
     public function __construct(FeeditingPlugin &$plugin, $format, $segmentid = null, $eob = null)
@@ -64,7 +66,7 @@ class FeeditableContent {
     protected function init(){
 
         foreach($this->contentBlocks as $blockId => $blockDef){
-            list($this->{"open".ucfirst($blockId)},$this->{"close".ucfirst($blockId)}) = explode('%s', $blockDef['template']);
+            list($this->{"open".ucfirst($blockId)},$this->{"close".ucfirst($blockId)}) = explode($this->tmplstrSeparator, $blockDef['template']);
         }
 
         $this->contentBlocks = array_merge([
@@ -214,15 +216,16 @@ class FeeditableContent {
                             {
                                 // build special block
                                 preg_match($b_def['dataregex'], $line, $b_data);
+                                array_shift($b_data);
                                 switch($b_def['insert'])
                                 {
                                     case 'inline':
-                                        $ret[$lineno] = sprintf($this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL), end($b_data));
+                                        $ret[$lineno] = $this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL, $b_data);
                                         break;
 
                                     case 'array':
                                         $ret[$lineno-1] = $this->insertEditableTag($lineno, $class, 'start', $b_type, MARKDOWN_EOL);
-                                        $ret[$lineno] = end($b_data);
+                                        $ret[$lineno] = reset($b_data);
                                         $ret[$lineno+1] = $this->insertEditableTag($lineno, $class, 'stop', $b_type, MARKDOWN_EOL);
                                         break;
                                 }
@@ -291,7 +294,7 @@ class FeeditableContent {
         $this->blocks = $stripped;
     }
 
-    private function insertEditableTag( $contentUid, $contentClass, $mode='auto', $blockType='text', $eol = PHP_EOL)
+    private function insertEditableTag( $contentUid, $contentClass, $mode='auto', $blockType='text', $eol = PHP_EOL, $formatterargs = [])
     {
         if($mode == 'stop'){
             return $eol.$this->remToCloseCurrentBlockWith.$eol.PHP_EOL;
@@ -302,10 +305,16 @@ class FeeditableContent {
 
         $stopBlock = $this->{'close'.ucfirst($blockType)};
         $openBlock = $this->{'open'.ucfirst($blockType)};
+
         $openBlock = strtr($openBlock, array(
             '###id###' => $id,
             '###class###' => $class
         ));
+
+        if(count($formatterargs)){
+            $openBlock = vsprintf($openBlock, $formatterargs);
+            $stopBlock = vsprintf($stopBlock, $formatterargs);
+        }
 
         switch($mode){
 
@@ -336,7 +345,11 @@ class FeeditableContent {
                 //if( $this->plugin->getReplacement($startmark) === false )
                     $this->plugin->setReplacement($startmark,$openBlock);
 
-                return $eol.$startmark.$eol.'%s'.$eol.$stopmark.$eol.PHP_EOL;
+                $ret = $eol.$startmark.$eol.$this->tmplstrSeparator.$eol.$stopmark.$eol.PHP_EOL;
+                if(count($formatterargs)){
+                    $ret = vsprintf($ret, $formatterargs);
+                }
+                return $ret;
         }
     }
 } 

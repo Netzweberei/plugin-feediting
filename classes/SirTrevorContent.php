@@ -29,9 +29,9 @@ class SirTrevorContent extends FeeditableContent {
             "insert" => 'inline'
         ],
         "widgetBlock" => [
-            "template" => '{"type":"widget","data":{"selected":"%s"}},',
+            "template" => '{"type":"widget","data":{"selected":"%s", "slide":"%2$d"}},',
             "mdregex" => '/^\{\{\s?widget/',
-            "dataregex" => '/\([\'\"]{1}(.*)[\'\"]{1}\)/',
+            "dataregex" => '/\([\'\"]{1}(.*)[\'\"]{1}\,?\s?([0-9]*)\)/',
             "insert" => 'inline'
         ],
         "imageBlock" => [
@@ -194,18 +194,6 @@ class SirTrevorContent extends FeeditableContent {
         return false;
     }
 
-    public function getWidgetByName(){
-        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
-        $widgetsExtension->renderWidget($_REQUEST['name'], $fireEvents=true);
-        return $_cmd = 'bypass';
-    }
-
-    public function saveWidget(){
-        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
-        $widgetsExtension->renderWidget($_REQUEST['name'], $fireEvents=true);
-        return $_cmd = 'bypass';
-    }
-
     private function json2array($json){
 
         $blocks = array();
@@ -259,21 +247,25 @@ class SirTrevorContent extends FeeditableContent {
         }
     }
 
+    public function getWidgetByName(){
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        $widgetsExtension->renderWidget($_REQUEST['name'], $_REQUEST['slide'], $fireEvents=true);
+        return $_cmd = 'bypass';
+    }
+
+    public function saveWidget(){
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        $widgetsExtension->renderWidget($_REQUEST['name'], $_REQUEST['slide'], $fireEvents=true);
+        return $_cmd = 'bypass';
+    }
+
     public function loadAvailableWidgets(){
-        die('{"type": "widget", "data": {"available": [
-            {
-                "name": "box1",
-                "icon": "box",
-                "type": "box",
-                "uri": "_box1"
-            },
-            {
-                "name": "box2",
-                "icon": "widget",
-                "type": "box",
-                "uri": "_box2"
-            }
-        ]}}');
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+
+        $ret = ['type'=>'widget'];
+        $ret['data'] = $widgetsExtension->getAvailableWidgets();
+
+        die(json_encode($ret));
     }
 
 } 

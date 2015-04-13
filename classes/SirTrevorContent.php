@@ -263,7 +263,16 @@ class SirTrevorContent extends FeeditableContent {
         $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
 
         $ret = ['type'=>'widget'];
-        $ret['data'] = $widgetsExtension->getAvailableWidgets();
+        $ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
+
+        die(json_encode($ret));
+    }
+
+    public function copySelectedWidget(){
+        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+
+        $ret = [];
+        $ret['selected'] = $widgetsExtension->doCopyWidget($_REQUEST['widget'], '@site/widgets');
 
         die(json_encode($ret));
     }

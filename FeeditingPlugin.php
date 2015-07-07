@@ -197,7 +197,8 @@ class FeeditingPlugin extends \Herbie\Plugin
                             $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
                         ));
 
-                        die($this->app->renderContentSegment($changed['segmentid']));
+                        $ret = $this->app->renderContentSegment($changed['segmentid']);
+                        die($ret);
                     }
                 }
                 break;

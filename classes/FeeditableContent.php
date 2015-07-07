@@ -216,7 +216,7 @@ class FeeditableContent {
                             {
                                 // build special block
                                 preg_match($b_def['dataregex'], $line, $b_data);
-                                array_shift($b_data);
+                                if(count($b_data)>1) array_shift($b_data);
                                 switch($b_def['insert'])
                                 {
                                     case 'inline':

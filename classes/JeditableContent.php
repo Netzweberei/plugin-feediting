@@ -86,7 +86,8 @@ function withContainer'.ucfirst($containerId).'() {
         tooltip   : "Click to edit...",
         ajaxoptions : {
             replace : "with",
-            container : "'.$segmentSelector.'"
+            container : "'.$segmentSelector.'",
+            run: "withContainer'.ucfirst($containerId).'();"
         }
     });
 };

@@ -345,13 +345,18 @@
                                   success : function(result, status) {
                                       if (ajaxoptions.dataType == 'html') {
                                           if(ajaxoptions.replace == 'with'){
-                                              if(ajaxoptions.container)
-                                                  $(ajaxoptions.container ).replaceWith(result);
-                                              else
-                                                $(self).replaceWith(result);
+                                              if(ajaxoptions.container){
+                                                  $(ajaxoptions.container ).html(result);
+                                              } else {
+                                                  $(self).replaceWith(result);
+                                              }
                                           }
-                                          else
+                                          else {
                                               $(self).html(result);
+                                          }
+                                          if(ajaxoptions.run){
+                                              eval(ajaxoptions.run);
+                                          }
                                       }
                                       self.editing = false;
                                       callback.apply(self, [result, settings]);

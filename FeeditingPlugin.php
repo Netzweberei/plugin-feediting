@@ -175,7 +175,7 @@ class FeeditingPlugin extends \Herbie\Plugin
                     }
 
                     if($this->cmd == 'saveAndReturn') return;
-                    $this->cmd == 'reload';
+                    $this->cmd = 'reload';
 
                     $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
                     $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
@@ -197,7 +197,8 @@ class FeeditingPlugin extends \Herbie\Plugin
                             $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
                         ));
 
-                        die($this->app->renderContentSegment($changed['segmentid']));
+                        $ret = $this->app->renderContentSegment($changed['segmentid']);
+                        die($ret);
                     }
                 }
                 break;
@@ -339,7 +340,10 @@ class FeeditingPlugin extends \Herbie\Plugin
      */
     private function renderRawContent( $content, $format, $stripLF = false )
     {
-        $ret = strtr($content, array( constant(strtoupper($format).'_EOL') => $stripLF ? '' : PHP_EOL ));
+        $ret = strtr($content, [
+            constant(strtoupper($format).'_EOL') => $stripLF ? '' : PHP_EOL,
+            'MARKDOWN_EOL' => PHP_EOL
+        ]);
         $ret = strtr($ret, $this->remove_pairs);
         return $ret;
     }
@@ -359,27 +363,31 @@ class FeeditingPlugin extends \Herbie\Plugin
             $this->app['twig']->environment->setLoader($herbieLoader);
 
             $formatter = \Herbie\Formatter\FormatterFactory::create($format);
-            $ret = strtr($formatter->transform($twigged), $this->replace_pairs);
+            $content = strtr($formatter->transform($twigged), $this->replace_pairs);
 
         } else {
 
             $content = strtr($content, $this->replace_pairs);
-            $ret = strtr($content, array(PHP_EOL => ''));
         }
 
-        return $this->editableContent[$contentId]->getEditableContainer($contentId, $ret);
+        return $this->editableContent[$contentId]->getEditableContainer($contentId, $content);
     }
 
     private function defineLineFeed($format, $eol)
     {
-        $FORMAT_EOL = strtoupper($format).'_EOL';
+        $FORMAT_EOL = $this->getLineFeedMarker($format);
+        $EDITABLE_FORMAT_EOL = $this->getLineFeedMarker($format, 1);
         // used for saving
         if(!defined($FORMAT_EOL)) define($FORMAT_EOL, $eol);
         // used in in-page-editor
-        if(!defined('EDITABLE_'.$FORMAT_EOL)) define('EDITABLE_'.$FORMAT_EOL, $eol);
+        if(!defined($EDITABLE_FORMAT_EOL)) define($EDITABLE_FORMAT_EOL, $eol);
 
         $this->replace_pairs[$eol] = '';
         $this->remove_pairs[$eol] = '';
+    }
+
+    public function getLineFeedMarker($format, $editable=false){
+        return ($editable ? 'EDITABLE_' : '').strtoupper($format).'_EOL';
     }
 
     private function getContentfileHeader()
@@ -450,8 +458,9 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     public function includeAfterBodyStarts($tagOrPath){
 
+        $configuredBodyTag = $this->config->get('plugins.config.feediting.bodyTag');
         $this->app['twig']->environment->setLoader(new Twig_Loader_String());
-        $twiggedBody = $this->app['twig']->environment->render('<body class="{{ bodyclass() }}">');
+        $twiggedBody = $this->app['twig']->environment->render($configuredBodyTag ? $configuredBodyTag : '<body>');
 
         $this->includeIntoTag($twiggedBody, $tagOrPath);
     }

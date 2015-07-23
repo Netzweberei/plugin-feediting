@@ -66,7 +66,7 @@ class JeditableContent extends FeeditableContent {
     public function getEditablesJsConfig( $path=null )
     {
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
+        //$this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
     }
 
     protected function setJSEditableConfig( $containerId = 0 )
@@ -86,7 +86,8 @@ function withContainer'.ucfirst($containerId).'() {
         tooltip   : "Click to edit...",
         ajaxoptions : {
             replace : "with",
-            container : "'.$segmentSelector.'"
+            container : "'.$segmentSelector.'",
+            run: "withContainer'.ucfirst($containerId).'();"
         }
     });
 };

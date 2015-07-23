@@ -71,12 +71,12 @@ class FeeditableContent {
 
         $this->contentBlocks = array_merge([
             "exclude-1" => [
-                "mdregex" => '/^-- row .*/',
+                "mdregex" => '/^$/',
                 "template" => '',
                 "insert" => 'inline'
             ],
             "exclude-2" => [
-                "mdregex" => '/^-- end --$/',
+                "mdregex" => '/^-- row .*/',
                 "template" => '',
                 "insert" => 'inline'
             ],
@@ -86,7 +86,7 @@ class FeeditableContent {
                 "insert" => 'inline'
             ],
             "exclude-4" => [
-                "mdregex" => '/^$/',
+                "mdregex" => '/^-- end --$/',
                 "template" => '',
                 "insert" => 'inline'
             ],
@@ -192,7 +192,9 @@ class FeeditableContent {
         $lines = explode($eol, $content);
         foreach($lines as $ctr => $line)
         {
-            $lineno = $this->calcLineIndex($ctr, $dimensionOffset);
+            $lineno      = $this->calcLineIndex($ctr, $dimensionOffset);
+            // switch between save- and edit-view
+            $withCmdSave = strpos($this->plugin->cmd, 'save')!==false ? true : false;
 
             switch($line)
             {
@@ -213,7 +215,7 @@ class FeeditableContent {
                             }
 
                             // if edit-view requires masking distinct chars
-                            if(isset($b_def['editingMaskMap']) && $this->plugin->cmd != 'save'){
+                            if(isset($b_def['editingMaskMap']) && $withCmdSave===false){
                                 $line = strtr($line, $b_def['editingMaskMap']);
                             }
 
@@ -229,7 +231,7 @@ class FeeditableContent {
                                         break;
 
                                     case 'inlineButWriteRegex0':
-                                        $ret[$lineno] = $this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL, $this->plugin->cmd == 'save' ? reset($b_data) : array_slice($b_data, 1));
+                                        $ret[$lineno] = $this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL, $withCmdSave!==false ? reset($b_data) : array_slice($b_data, 1));
                                         break;
 
                                     case 'array':
@@ -248,7 +250,7 @@ class FeeditableContent {
                     }
 
                     // if edit-view requires masking distinct chars
-                    if(isset($b_def['editingMaskMap']) && $this->plugin->cmd != 'save'){
+                    if(isset($b_def['editingMaskMap']) && $withCmdSave===false){
                         $line = strtr($line, $b_def['editingMaskMap']);
                     }
 

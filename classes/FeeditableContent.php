@@ -193,8 +193,14 @@ class FeeditableContent {
         foreach($lines as $ctr => $line)
         {
             $lineno      = $this->calcLineIndex($ctr, $dimensionOffset);
+
             // switch between save- and edit-view
             $withCmdSave = strpos($this->plugin->cmd, 'save')!==false ? true : false;
+
+            // get rid of ms-cr's
+            $line = strtr($line, [
+                "\r" => ''
+            ]);
 
             switch($line)
             {

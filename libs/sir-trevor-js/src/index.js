@@ -84,6 +84,28 @@ var SirTrevor = {
     }
   },
 
+  dragBlockFromInstanceToInstance: function(block, dropped_on) {
+
+      var fromInstance = SirTrevor.getInstance(block.attr('data-instance'));
+      var toInstance = SirTrevor.getInstance(dropped_on.parents(".st-outer").attr("id"));
+      var blockObj = fromInstance.block_manager.findBlockById(block.attr('data-id'));
+
+      blockObj.instanceID = dropped_on.attr('data-instance');
+      blockObj.mediator = toInstance.mediator;
+
+      block.attr('data-instance',dropped_on.attr('data-instance'));
+      $('#' + block.attr('data-id') + ' .st-block__ui').empty();
+      blockObj._initUIComponents();
+
+      toInstance.block_manager.copyBlock(blockObj);
+      toInstance.removeBlockDragOver();
+
+      fromInstance.block_manager.removeBlock(blockID);
+      fromInstance.block_manager.triggerBlockCountUpdate();
+
+      dropped_on.after(block);
+  }
+
 };
 
 Object.assign(SirTrevor, require('./form-events'));

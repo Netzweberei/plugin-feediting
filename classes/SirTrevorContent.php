@@ -237,7 +237,7 @@ class SirTrevorContent extends FeeditableContent {
         if($_FILES)
         {
             $uploaddir = dirname($this->plugin->path);
-            $uploadfile = $uploaddir . DS. basename($_FILES['attachment']['name']['file']);
+            $uploadfile = filter_var($uploaddir . DS. basename($_FILES['attachment']['name']['file']), FILTER_SANITIZE_URL);
             if (move_uploaded_file($_FILES['attachment']['tmp_name']['file'], $uploadfile))
             {
                 $relpath = strtr($uploadfile, array($this->plugin->alias->get('@site') => '/site'));

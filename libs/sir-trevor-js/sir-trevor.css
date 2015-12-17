@@ -204,13 +204,11 @@
   color: #d4d4d4; }
 
 .st-text-block {
-  min-height: 3em;
-  font-size: 1.275em;
-  line-height: 1.45; }
+  min-height: 3em; }
 
 .st-text-block--heading {
   line-height: 1.1;
-  font-size: 2.2em;
+  font-size: 2em;
   min-height: auto;
   font-weight: 700; }
 
@@ -291,6 +289,10 @@ ul.st-text-block {
   height: auto; }
 
 .st-block__upload-container {
+  margin: 0.4em 0 0 0;
+  text-align: center; }
+
+.st-block__widgets-container {
   margin: 0.4em 0 0 0;
   text-align: center; }
 
@@ -448,7 +450,8 @@ ul.st-text-block {
   text-align: center;
   background: #fff;
   color: #d70014;
-  padding: 0.4em 0; }
+  padding: 0.4em 0;
+  margin-bottom: 0px;  }
 
 .st-format-bar {
   position: absolute;
@@ -507,12 +510,20 @@ ul.st-text-block {
 
 .st-submit,
 .st-submit input[type=submit] {
- width: 100%;
- color: #ffffff;
- background-color: #34e0c2;
- border: 0px; }
+  width: 100%;
+  color: #ffffff;
+  background-color: #34e0c2;
+  border: 0px; }
 
 .st-submit input[type=submit].top {
- position: fixed;
- top: 0;
- left: 0; }
+  position: fixed;
+  z-index: 999;
+  bottom: 0;
+  left: 0; }
+
+.adminpanel {
+  position: fixed;
+  z-index: 999;
+  width: 100%;
+  top: 0;
+  left: 0; }

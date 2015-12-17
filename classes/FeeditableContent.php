@@ -66,17 +66,17 @@ class FeeditableContent {
     protected function init(){
 
         foreach($this->contentBlocks as $blockId => $blockDef){
-            list($this->{"open".ucfirst($blockId)},$this->{"close".ucfirst($blockId)}) = explode($this->tmplstrSeparator, $blockDef['template']);
+            list($this->{"open".ucfirst($blockId)},$this->{"close".ucfirst($blockId)}) = explode(isset($blockDef['tmplstrSeparator']) ? $blockDef['tmplstrSeparator'] : $this->tmplstrSeparator, $blockDef['template']);
         }
 
         $this->contentBlocks = array_merge([
             "exclude-1" => [
-                "mdregex" => '/^-- row .*/',
+                "mdregex" => '/^$/',
                 "template" => '',
                 "insert" => 'inline'
             ],
             "exclude-2" => [
-                "mdregex" => '/^-- end --$/',
+                "mdregex" => '/^-- row .*/',
                 "template" => '',
                 "insert" => 'inline'
             ],
@@ -86,7 +86,7 @@ class FeeditableContent {
                 "insert" => 'inline'
             ],
             "exclude-4" => [
-                "mdregex" => '/^$/',
+                "mdregex" => '/^-- end --$/',
                 "template" => '',
                 "insert" => 'inline'
             ],
@@ -192,7 +192,15 @@ class FeeditableContent {
         $lines = explode($eol, $content);
         foreach($lines as $ctr => $line)
         {
-            $lineno = $this->calcLineIndex($ctr, $dimensionOffset);
+            $lineno      = $this->calcLineIndex($ctr, $dimensionOffset);
+
+            // switch between save- and edit-view
+            $withCmdSave = strpos($this->plugin->cmd, 'save')!==false ? true : false;
+
+            // get rid of ms-cr's
+            $line = strtr($line, [
+                "\r" => ''
+            ]);
 
             switch($line)
             {
@@ -212,6 +220,11 @@ class FeeditableContent {
                                 $openBlock = true;
                             }
 
+                            // if edit-view requires masking distinct chars
+                            if(isset($b_def['editingMaskMap']) && $withCmdSave===false){
+                                $line = strtr($line, $b_def['editingMaskMap']);
+                            }
+
                             if($b_def['template'] !== '')
                             {
                                 // build special block
@@ -221,6 +234,10 @@ class FeeditableContent {
                                 {
                                     case 'inline':
                                         $ret[$lineno] = $this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL, $b_data);
+                                        break;
+
+                                    case 'inlineButWriteRegex0':
+                                        $ret[$lineno] = $this->insertEditableTag($lineno, $class, 'auto', $b_type, MARKDOWN_EOL, $withCmdSave!==false ? reset($b_data) : array_slice($b_data, 1));
                                         break;
 
                                     case 'array':
@@ -238,16 +255,22 @@ class FeeditableContent {
                         }
                     }
 
+                    // if edit-view requires masking distinct chars
+                    if(isset($b_def['editingMaskMap']) && $withCmdSave===false){
+                        $line = strtr($line, $b_def['editingMaskMap']);
+                    }
+
                     if($openBlock)
                     {
                         $blockId = $lineno;
                         $ret[$blockId-1] = ($this->segmentid === false) ? '' : $this->insertEditableTag($blockId, $class, 'start', 'textBlock', MARKDOWN_EOL);
-                        $ret[$blockId] = $line.$eol;
+                        // respect linebreaks
+                        $ret[$blockId] = $line.($b_def['insert']=='multiline' ? $this->getLineFeedMarker($this->getFormat()) : $eol);
                         $openBlock = false;
                     }
                     else
                     {
-                        $ret[$blockId] .= $line.$eol;
+                        $ret[$blockId] .= $line.($b_def['insert']=='multiline' ? $this->getLineFeedMarker($this->getFormat()) : $eol);
                     }
             }
         }
@@ -311,10 +334,12 @@ class FeeditableContent {
             '###class###' => $class
         ));
 
-        if(count($formatterargs)){
-            $openBlock = vsprintf($openBlock, $formatterargs);
-            $stopBlock = vsprintf($stopBlock, $formatterargs);
+        if(!is_array($formatterargs)){
+            $formatterargs = array($formatterargs);
         }
+
+        $openBlock = @vsprintf($openBlock, $formatterargs);
+        $stopBlock = @vsprintf($stopBlock, $formatterargs);
 
         switch($mode){
 
@@ -345,11 +370,14 @@ class FeeditableContent {
                 //if( $this->plugin->getReplacement($startmark) === false )
                     $this->plugin->setReplacement($startmark,$openBlock);
 
-                $ret = $eol.$startmark.$eol.$this->tmplstrSeparator.$eol.$stopmark.$eol.PHP_EOL;
-                if(count($formatterargs)){
-                    $ret = vsprintf($ret, $formatterargs);
-                }
+                $ret = $eol.$startmark.$eol.reset($formatterargs).$eol.$stopmark.$eol.PHP_EOL;
+                //$ret = vsprintf($ret, $formatterargs);
+
                 return $ret;
         }
+    }
+
+    protected function getLineFeedMarker(){
+        return PHP_EOL;
     }
 } 

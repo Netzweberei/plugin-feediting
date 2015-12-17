@@ -21,24 +21,34 @@ class SirTrevorContent extends FeeditableContent {
 
     public $editableEmptySegmentContent = PHP_EOL;
 
+    protected $eob = '';
+
     protected $contentBlocks = [
         "headingBlock" => [
             "template" => '{"type":"heading","data":{"text":"%s"}},',
             "mdregex" => '/^#/',
             "dataregex" => '/(.*)/',
+            "editingMaskMap" => ['"' => '\"'],
             "insert" => 'inline'
         ],
         "widgetBlock" => [
             "template" => '{"type":"widget","data":{"selected":"%s", "slide":"%2$d"}},',
             "mdregex" => '/^\{\{\s?widget/',
-            "dataregex" => '/\([\'\"]{1}(.*)[\'\"]{1}\,?\s?([0-9]*)\)/',
-            "insert" => 'inline'
+            "dataregex" => '/(^.*\([\'\"]{1}(.*)[\'\"]{1}\,?\s?([0-9]*)\).*$)/',
+            "insert" => 'inlineButWriteRegex0'
         ],
         "imageBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\!\[/',
-            "dataregex" => '/\((.*)\)/',
-            "insert" => 'inline'
+            "dataregex" => '/(^.*\((.*)\).*$)/',
+            "insert" => 'inlineButWriteRegex0'
+        ],
+        "videoBlock" => [
+            "template" => '{"type":"video","data":{"source":"youtube","remote_id":"%1$s"}},',
+            "mdregex" => '/^\{\{ youtube/',
+            "dataregex" => '/(^{\{ youtube\("(.*)".*$)/',
+            "insert" => 'inlineButWriteRegex0',
+            "tmplstrSeparator" => '%1$s'
         ],
         // @TODO: Define custom-imagine-block for ST
         "imagineBlock" => [
@@ -51,7 +61,8 @@ class SirTrevorContent extends FeeditableContent {
             "template" => '{"type":"text","data":{"text":"%s"}},',
             "mdregex" => '/.*/',
             "dataregex" => '/.*/',
-            "insert" => 'inline'
+            "editingMaskMap" => ['"' => '\"'],
+            "insert" => 'multiline'
         ],
     ];
 
@@ -75,6 +86,10 @@ class SirTrevorContent extends FeeditableContent {
         $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
         $this->plugin->includeBeforeBodyEnds('</form>');
 
+        $uploadPath = DIRECTORY_SEPARATOR.strtr($this->plugin->app['alias']->get($this->plugin->app['menuItem']->getRoute()),[
+            $this->plugin->app['alias']->get('@page') => ''
+        ]);
+
         foreach($this->plugin->segments as $segmentid => $segment)
         {
             $this->plugin->includeBeforeBodyEnds(
@@ -95,7 +110,7 @@ class SirTrevorContent extends FeeditableContent {
         defaultType: "Text"
       });
       SirTrevor.setDefaults({
-        uploadUrl: "/?cmd=upload"
+        uploadUrl: "'.$uploadPath.'?cmd=upload"
       });
 '.
 '</script>'
@@ -112,6 +127,9 @@ class SirTrevorContent extends FeeditableContent {
     public function getEditableContainer($contentId, $content)
     {
         $ret = '';
+        $content = strtr($content, [
+            PHP_EOL => ''
+        ]);
 
         if($contentId == 0) {
             $ret .= '<div class="st-submit"><input type="submit" value="click to save changes" class="top" ><input type="hidden" name="id" value="sirtrevor-'.$contentId.'" ></input></div>';
@@ -121,6 +139,10 @@ class SirTrevorContent extends FeeditableContent {
             $ret .= '<input type="hidden" name="name" value="'.$_REQUEST['name'].'" />';
         }
         $ret .= '<textarea name="sirtrevor-'.$contentId.'" class="sirtrevor-'.$contentId.'">'.sprintf($this->contentContainer, $content).'</textarea>';
+
+        $ret = strtr($ret, [
+            'MARKDOWN_EOL'  => '<br>'
+        ]);
 
         return $ret;
     }
@@ -141,41 +163,19 @@ class SirTrevorContent extends FeeditableContent {
         );
     }
 
-    public function getSegment($json_encode=true){
-        if($json_encode){
-            return implode( $this->getEob(),  $this->getContent() );
-        }
-        else
-            return implode( $this->getContent($json_decode=true) );
+    public function getSegment($eob=true){
+        return implode( $this->getEob(),  $this->blocks );
     }
 
-    public function getContent($json_decode=false){
-        $ret = [];
-        if($json_decode){
-            $ret = $this->json2array($this->getContentBlockById($this->segmentid));
-        } else {
-            foreach($this->blocks as $k => $v){
-                $ret[$k] = strtr($v, array(
-                    '"' => '\"'
-                ));
-            }
-        }
-        return $ret;
-    }
-
-    public function getContentBlockById($id){
-        $ret = null;
+    /**
+     * @param $id of block i.e. segment
+     * @return string $ret whole segment as one big block
+     */
+    public function getContentBlockById($id=null){
         if($this->blocks){
-            $html       = implode($this->blocks);
-            $oneline    = strtr($html, array(
-                PHP_EOL => '',
-                '\\n'   => '',
-                '\\'    => '',
-            ));
-            $json       = strtr($oneline, array_merge(array('"'=>'\"'), $this->plugin->replace_pairs));
-            $ret        = sprintf($this->contentContainer, $json);
+            return implode($this->blocks);
         }
-        return $ret;
+        return null;
     }
 
     public function setContentBlockById($id, $json){
@@ -187,6 +187,7 @@ class SirTrevorContent extends FeeditableContent {
 
             // Reindex all blocks
             $modified = $this->plugin->renderRawContent(implode($this->getContent()), $this->getFormat(), true );
+
             $this->setContent($modified);
 
             return true;
@@ -194,10 +195,11 @@ class SirTrevorContent extends FeeditableContent {
         return false;
     }
 
-    private function json2array($json){
-
+    private function json2array($json)
+    {
         $blocks = array();
         $content = json_decode($json);
+
         if(isset($content->data))
         {
             foreach($content->data as $_block)
@@ -208,21 +210,32 @@ class SirTrevorContent extends FeeditableContent {
                     switch($_block->type)
                     {
                         case 'widget':
-                            $blocks[] = '{{widget(\''.basename($_block->data->selected).'\')}}'.PHP_EOL;
+                            $blocks[] = '{{widget(\''.basename($_block->data->selected).'\', '.$_block->data->slide.')}}'.PHP_EOL;
+                            break;
+                        case 'video':
+                            $blocks[] = '{{ youtube("'.$_block->data->remote_id.'", 480, 320) }}'.PHP_EOL;
                             break;
                         case 'image':
                             $blocks[] = '!['.basename($_block->data->file->url).']('.$_block->data->file->url.')'.PHP_EOL;
                             break;
                         case 'heading':
-                            $test = strtr(trim($_block->data->text), array(PHP_EOL => '')).PHP_EOL;
+                            $test = strtr(trim($_block->data->text), [
+                                    PHP_EOL => '',
+                                    '\\'    => ''
+                            ]);
+                            // show headings in md-format
                             if(substr($test, 0, 1)!=='#'){
                                 $test = '#'.$test;
                             }
-                            $blocks[] = $test;
+                            $blocks[] = html_entity_decode($test, ENT_QUOTES).PHP_EOL;
                             break;
                         case 'text':
                         default:
-                            $blocks[] = strtr($_block->data->text, array(PHP_EOL => '')).PHP_EOL;
+                            $test = strtr($_block->data->text, [
+                                '\n' => PHP_EOL,
+                                '\\' => '' // demask before saving
+                            ]).PHP_EOL;
+                            $blocks[] = html_entity_decode($test, ENT_QUOTES).PHP_EOL;
                             break;
                     }
                 }
@@ -236,7 +249,9 @@ class SirTrevorContent extends FeeditableContent {
 
         if($_FILES)
         {
-            $uploaddir = dirname($this->plugin->path);
+
+            $uploaddir = dirname($this->plugin->app['alias']->get($this->plugin->app['menuItem']->getPath()));
+
             $uploadfile = filter_var($uploaddir . DS. basename($_FILES['attachment']['name']['file']), FILTER_SANITIZE_URL);
             if (move_uploaded_file($_FILES['attachment']['tmp_name']['file'], $uploadfile))
             {
@@ -275,6 +290,10 @@ class SirTrevorContent extends FeeditableContent {
         $ret['selected'] = $widgetsExtension->doCopyWidget($_REQUEST['widget'], '@site/widgets');
 
         die(json_encode($ret));
+    }
+
+    protected function getLineFeedMarker(){
+        return $this->plugin->getLineFeedMarker($this->getFormat());
     }
 
 } 

@@ -41,9 +41,21 @@ class FeeditingPlugin extends \Herbie\Plugin
         $this->authenticated = $this->isAuthenticated();
 
         // set defaults
-        $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'placeholder-');
-        $this->config->set('plugins.config.feediting.editable_prefix', 'editable_');
-        $this->config->set('plugins.config.feediting.contentBlockDimension', 100);
+        if($this->config->isEmpty('plugins.config.feediting.contentSegment_WrapperPrefix')) {
+            $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'placeholder-');
+        }
+
+        if($this->config->isEmpty('plugins.config.feediting.editable_prefix')) {
+            $this->config->set('plugins.config.feediting.editable_prefix', 'editable_');
+        }
+
+        if($this->config->isEmpty('plugins.config.feediting.contentBlockDimension')) {
+            $this->config->set('plugins.config.feediting.contentBlockDimension', 100);
+        }
+
+        if($this->config->isEmpty('plugins.config.feediting.dontProvideJquery')) {
+            $this->config->set('plugins.config.feediting.dontProvideJquery', false);
+        }
 
         // set editor
         switch($this->config->get('plugins.config.feediting.editor')){

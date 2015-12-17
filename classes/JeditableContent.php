@@ -66,7 +66,9 @@ class JeditableContent extends FeeditableContent {
     public function getEditablesJsConfig( $path=null )
     {
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
+        if(false === $this->pluginConfig['dontProvideJquery']) {
+            $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
+        }
     }
 
     protected function setJSEditableConfig( $containerId = 0 )

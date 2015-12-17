@@ -121,7 +121,9 @@ class SirTrevorContent extends FeeditableContent {
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/sir-trevor.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/Eventable/eventable.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/underscore/underscore.js');
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
+        if(false === $this->pluginConfig['dontProvideJquery']) {
+            $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
+        }
     }
 
     public function getEditableContainer($contentId, $content)

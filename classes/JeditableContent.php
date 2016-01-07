@@ -63,8 +63,14 @@ class JeditableContent extends FeeditableContent {
         return $content;
     }
 
+    public function getEditablesCssConfig($path=null){
+        $this->plugin->includeIntoHeader($path.'libs/simplemde/dist/simplemde.min.css');
+    }
+
     public function getEditablesJsConfig( $path=null )
     {
+        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
+        $this->plugin->includeBeforeBodyEnds($path.'libs/simplemde/dist/simplemde.min.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
         if(false === $this->pluginConfig['dontProvideJquery']) {
             $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
@@ -82,7 +88,7 @@ function withContainer'.ucfirst($containerId).'() {
     $("'.$blockSelector.'").editable("?cmd=save&renderer=markdown", {
         indicator : "<img src=\'/assets/feediting/libs/jquery_jeditable-master/img/indicator.gif\'>",
         loadurl   : "?cmd=load&segmentid='.$containerId.'&renderer=markdown",
-        type      : "textarea",
+        type      : "simplemde",
         submit    : "OK",
         cancel    : "Cancel",
         tooltip   : "Click to edit...",

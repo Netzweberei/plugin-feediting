@@ -17,6 +17,8 @@ use Herbie\Loader\FrontMatterLoader;
 use Herbie\Menu;
 use Twig_SimpleFunction;
 
+if(!defined('DS')) define('DS', DIRECTORY_SEPARATOR);
+
 class FeeditingPlugin
 {
     protected $config = [];
@@ -247,24 +249,18 @@ class FeeditingPlugin
 
     protected function onOutputGenerated($response)
     {
-//        $_app          = $event->offsetGet('app');
-//        $_plugins      = $_app['config']->get('plugins');
-//        $_plugin_path  = str_replace($_app['webPath'], '', $_plugins['path']).'/feediting/';
-
         $this->response = $response;
+        $this->self = $this->config->get('plugins.path').'/feediting/';
 
-        $_selfpath = $this->config->get('plugins.path').'/feediting/';
-
-        $this->getEditablesCssConfig($_selfpath);
-
-        $this->getEditablesJsConfig($_selfpath);
+        $this->getEditablesCssConfig($this->self);
+        $this->getEditablesJsConfig($this->self);
 
         $response->setContent(
             strtr($response->getContent(), $this->replace_pairs)
         );
     }
 
-    private function includeIntoTag($tag=null, $tagOrPath)
+    private function includeIntoTag($tag=null, $uri)
     {
         $ensureSrcExits = false;
 
@@ -273,30 +269,38 @@ class FeeditingPlugin
         if(!isset($this->replace_pairs[$tag]))
             $this->replace_pairs[$tag] = $tag;
 
-        if(substr( $tagOrPath, 0, 1 ) == '<')
+        if(substr( $uri, 0, 1 ) == '<')
         {
             // include a tag:
-            if(substr( $tagOrPath, 0, 2 ) == '</')
-                $this->replace_pairs[$tag] = $tagOrPath.PHP_EOL.$this->replace_pairs[$tag];
+            if(substr( $uri, 0, 2 ) == '</')
+                $this->replace_pairs[$tag] = $uri.PHP_EOL.$this->replace_pairs[$tag];
             else
-                $this->replace_pairs[$tag] = $this->replace_pairs[$tag].PHP_EOL.$tagOrPath.PHP_EOL;
+                $this->replace_pairs[$tag] = $this->replace_pairs[$tag].PHP_EOL.$uri.PHP_EOL;
 
             return;
         }
         else
         {
             // include a path:
-            $abspath    = $this->alias->get('@plugin');
-            $dirname    = strtr(dirname($tagOrPath), array($abspath => ''));
-            $filename   = basename($tagOrPath);
+            $ref = 'src';
+            $filename   = basename($uri);
             $fileAtoms  = explode('.',basename($filename));
-            if( strpos($dirname, '://') > 1 ) {
-                $ref = 'src';
+            $webdir    = strtr(dirname($uri), array(
+                $this->alias->get('@plugin') => ''
+            ));
+
+            if( strpos($webdir, '://') > 1 ) {
                 $pathPrefix = '';
             } else {
-                $ref = 'src';
-                $pathPrefix = DIRECTORY_SEPARATOR.'assets';
-                $ensureSrcExits = true;
+                $pathPrefix = DS.'assets';
+
+                // copy src to assets
+                $webpath = $pathPrefix.$webdir.DS.$filename;
+                $abspath = $this->alias->get('@web').$webpath;
+                if(!file_exists($abspath)){
+                    @mkdir(dirname($abspath), 0777, true);
+                    copy($uri, $abspath);
+                }
             }
 
             switch(end($fileAtoms))
@@ -314,14 +318,7 @@ class FeeditingPlugin
             }
         }
 
-        $dist = $pathPrefix.$dirname.DIRECTORY_SEPARATOR.$filename;
-        $predist = $this->alias->get('@web');
-        if($ensureSrcExits && !file_exists($predist.$dist)){
-            @mkdir(dirname($predist.$dist), 0777, true);
-            copy($tagOrPath, $predist.$dist);
-        }
-
-        $this->replace_pairs[$tag] = sprintf($tmpl, $dist).PHP_EOL.$this->replace_pairs[$tag];
+        $this->replace_pairs[$tag] = sprintf($tmpl, $pathPrefix.$webdir.DS.$filename).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     private function getReplacement($mark){
@@ -491,18 +488,18 @@ class FeeditingPlugin
         return $config['plugins']['config']['feediting'];
     }
 
-    public function includeIntoHeader($tagOrPath){
-        $this->includeIntoTag('</head>', $tagOrPath);
+    public function includeIntoHeader($uri){
+        $this->includeIntoTag('</head>', $uri);
     }
 
-    public function includeAfterBodyStarts($tagOrPath){
+    public function includeAfterBodyStarts($uri){
         $matches = array(1 => '<body>'); // set default match, overwritten if regex finds something
         preg_match('/(<body[^>]*>)/', $this->response->getContent(), $matches);
-        $this->includeIntoTag($matches[1], $tagOrPath);
+        $this->includeIntoTag($matches[1], $uri);
     }
 
-    public function includeBeforeBodyEnds($tagOrPath){
-        $this->includeIntoTag('</body>', $tagOrPath);
+    public function includeBeforeBodyEnds($uri){
+        $this->includeIntoTag('</body>', $uri);
     }
 
     public function __get($attrib){

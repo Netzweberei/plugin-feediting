@@ -11,12 +11,19 @@
 
 namespace herbie\plugin\feediting;
 
-use Twig_Loader_String;
-use Symfony\Component\HttpFoundation\Session\Session;
+use Herbie\DI;
+use Herbie\Hook;
+use Herbie\Loader\FrontMatterLoader;
+use Herbie\Menu;
+use Twig_SimpleFunction;
 
-class FeeditingPlugin extends \Herbie\Plugin
+class FeeditingPlugin
 {
     protected $config = [];
+
+    protected $response;
+
+    protected $alias;
 
     protected $authenticated = false;
 
@@ -34,12 +41,22 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     private $cmd;
 
-    public function __construct(\Herbie\Application $app)
+    public function __construct()
     {
-        parent::__construct($app);
-
+        $this->config = DI::get('Config');
+        $this->alias = DI::get('Alias');
         $this->authenticated = $this->isAuthenticated();
+    }
 
+    public function install()
+    {
+        Hook::attach('pluginsInitialized', [$this, 'onPluginsInitialized']);
+        Hook::attach('pageLoaded', [$this, 'onPageLoaded']);
+        Hook::attach('outputGenerated', [$this, 'onOutputGenerated']);
+    }
+
+    public function onPluginsInitialized()
+    {
         // set defaults
         if($this->config->isEmpty('plugins.config.feediting.contentSegment_WrapperPrefix')) {
             $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'placeholder-');
@@ -72,18 +89,12 @@ class FeeditingPlugin extends \Herbie\Plugin
     }
 
     // fetch markdown-contents for jeditable
-    protected function onPageLoaded(\Herbie\Event $event )
+    protected function onPageLoaded( $page )
     {
         // Disable Caching while editing
-        $this->app['twig']->environment->setCache(false);
+        //$this->app['twig']->environment->setCache(false);
 
-        $this->alias = $this->app['alias'];
-
-        $this->path = $this->alias->get($this->app['menu']->getItem($this->app['route'])->getPath());
-
-        $this->page = $event->offsetGet('page');
-        $this->page->setLoader(new \Herbie\Loader\PageLoader($this->alias));
-        $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
+        $this->page = $page;
 
         $this->cmd = @$_REQUEST['cmd'];
 
@@ -148,7 +159,7 @@ class FeeditingPlugin extends \Herbie\Plugin
     protected function editWidget($event){
 
         // Disable Caching while editing
-        $this->app['twig']->environment->setCache(false);
+        //$this->app['twig']->environment->setCache(false);
 
         $this->page  = $this->app['page'];
         $this->alias = $this->app['alias'];
@@ -189,7 +200,7 @@ class FeeditingPlugin extends \Herbie\Plugin
                     if($this->cmd == 'saveAndReturn') return;
                     $this->cmd = 'reload';
 
-                    $this->page->load($this->app['urlMatcher']->match($this->app['route'])->getPath());
+                    $this->page->load($this->page->getPath());
                     $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
 
                     if($this->editableContent[$changed['segmentid']]->reloadPageAfterSave === true)
@@ -226,33 +237,37 @@ class FeeditingPlugin extends \Herbie\Plugin
         }
 
         $this->page->setSegments($this->segments);
+        $this->page->nocache = true;
     }
 
     protected function isAuthenticated()
     {
-        $ret = false;
-        if(!@$_REQUEST['action']=='logout') $ret = (bool) @$_SESSION['_sf2_attributes']['LOGGED_IN'];
-        return $ret;
+        return (bool) @$_SESSION['LOGGED_IN'];
     }
 
-    protected function onOutputGenerated(\Herbie\Event $event )
+    protected function onOutputGenerated($response)
     {
-        $_app          = $event->offsetGet('app');
-        $_response     = $event->offsetGet('response');
-        $_plugins      = $_app['config']->get('plugins');
-        $_plugin_path  = str_replace($_app['webPath'], '', $_plugins['path']).'/feediting/';
+//        $_app          = $event->offsetGet('app');
+//        $_plugins      = $_app['config']->get('plugins');
+//        $_plugin_path  = str_replace($_app['webPath'], '', $_plugins['path']).'/feediting/';
 
-        $this->getEditablesCssConfig($_plugin_path);
+        $this->response = $response;
 
-        $this->getEditablesJsConfig($_plugin_path);
+        $_selfpath = $this->config->get('plugins.path').'/feediting/';
 
-        $event->offsetSet('response', $_response->setContent(
-            strtr($_response->getContent(), $this->replace_pairs)
-        ));
+        $this->getEditablesCssConfig($_selfpath);
+
+        $this->getEditablesJsConfig($_selfpath);
+
+        $response->setContent(
+            strtr($response->getContent(), $this->replace_pairs)
+        );
     }
 
     private function includeIntoTag($tag=null, $tagOrPath)
     {
+        $ensureSrcExits = false;
+
         if(empty($tag)) return;
 
         if(!isset($this->replace_pairs[$tag]))
@@ -281,6 +296,7 @@ class FeeditingPlugin extends \Herbie\Plugin
             } else {
                 $ref = 'src';
                 $pathPrefix = DIRECTORY_SEPARATOR.'assets';
+                $ensureSrcExits = true;
             }
 
             switch(end($fileAtoms))
@@ -297,7 +313,15 @@ class FeeditingPlugin extends \Herbie\Plugin
                     return;
             }
         }
-        $this->replace_pairs[$tag] = sprintf($tmpl, $pathPrefix.$dirname.DIRECTORY_SEPARATOR.$filename).PHP_EOL.$this->replace_pairs[$tag];
+
+        $dist = $pathPrefix.$dirname.DIRECTORY_SEPARATOR.$filename;
+        $predist = $this->alias->get('@web');
+        if($ensureSrcExits && !file_exists($predist.$dist)){
+            @mkdir(dirname($predist.$dist), 0777, true);
+            copy($tagOrPath, $predist.$dist);
+        }
+
+        $this->replace_pairs[$tag] = sprintf($tmpl, $dist).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     private function getReplacement($mark){
@@ -404,6 +428,9 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     private function getContentfileHeader()
     {
+        // set current path
+        $this->path = $this->alias->get($this->page->getPath());
+
         // read page's header
         $fh = fopen($this->path, 'r');
         if($fh) {
@@ -469,12 +496,9 @@ class FeeditingPlugin extends \Herbie\Plugin
     }
 
     public function includeAfterBodyStarts($tagOrPath){
-
-        $configuredBodyTag = $this->config->get('plugins.config.feediting.bodyTag');
-        $this->app['twig']->environment->setLoader(new Twig_Loader_String());
-        $twiggedBody = $this->app['twig']->environment->render($configuredBodyTag ? $configuredBodyTag : '<body>');
-
-        $this->includeIntoTag($twiggedBody, $tagOrPath);
+        $matches = array(1 => '<body>'); // set default match, overwritten if regex finds something
+        preg_match('/(<body[^>]*>)/', $this->response->getContent(), $matches);
+        $this->includeIntoTag($matches[1], $tagOrPath);
     }
 
     public function includeBeforeBodyEnds($tagOrPath){
@@ -485,6 +509,7 @@ class FeeditingPlugin extends \Herbie\Plugin
         switch($attrib){
             case 'app':
             case 'path':
+            case 'alias':
             case 'cmd':
             case 'replace_pairs':
             case 'remove_pairs':
@@ -497,7 +522,7 @@ class FeeditingPlugin extends \Herbie\Plugin
 
     public function __call($funcname, $args)
     {
-        if($this->authenticated === true && 'adminpanel'!=$this->app->getRoute()){
+        if($this->authenticated === true && DI::get('Request')->getRequestUri() != '/adminpanel' ){
             switch(count($args)){
                 case 5:
                     return $this->{$funcname}($args[0], $args[1], $args[2], $args[3], $args[4]);
@@ -516,3 +541,5 @@ class FeeditingPlugin extends \Herbie\Plugin
         }
     }
 }
+
+(new FeeditingPlugin)->install();

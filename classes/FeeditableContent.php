@@ -118,8 +118,16 @@ class FeeditableContent {
      */
     public function setContent($content)
     {
-        // currently only (twitter-bootstrap)markdown supported!
-        $this->{'identify'.ucfirst($this->format).'Blocks'}($content);
+        switch($this->format){
+            case 'markdown':
+                // currently only (twitter-bootstrap)markdown supported!
+                $this->{'identify'.ucfirst($this->format).'Blocks'}($content);
+                break;
+
+            case 'raw':
+            default:
+                return;
+        }
 
         // strip empty blocks
         $this->stripEmptyContentblocks();

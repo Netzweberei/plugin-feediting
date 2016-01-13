@@ -15,9 +15,10 @@
  * Revision: $Id: jquery.jeditable.autogrow.js 344 2008-03-24 16:02:11Z tuupola $
  *
  */
- 
-$.editable.addInputType('charcounter', {
+var registermdes = [];
+$.editable.addInputType('simplemde', {
     element : function(settings, original) {
+
         var textarea = $('<textarea />');
         if (settings.rows) {
             textarea.attr('rows', settings.rows);
@@ -30,9 +31,29 @@ $.editable.addInputType('charcounter', {
             textarea.width(settings.width);
         }
         $(this).append(textarea);
+
         return(textarea);
     },
     plugin : function(settings, original) {
-        $('textarea', this).charCounter(settings.charcounter.characters, settings.charcounter);
+
+        for(i in registermdes){
+            if(i != $(original).attr('id')){
+//                console.log(i);
+//                console.log(registermdes[i].element.parentNode.parentNode);
+//                console.log($(registermdes[i].element.parentNode.parentNode).find('form button[type=cancel]'));
+                $(registermdes[i].element.parentNode.parentNode).find('form button[type=cancel]').click();
+            }
+        }
+
+        var simplemde = new SimpleMDE({
+            element: $(this).find('#'+$(original).attr('id')+' textarea')[0]
+        });
+
+        registermdes[$(original).attr('id')] = simplemde;
+
+//        simplemde.codemirror.on("blur", function(){
+//            $(original).find('form button[type=cancel]').click();
+//        });
     }
 });
+

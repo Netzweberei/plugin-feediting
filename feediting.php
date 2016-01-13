@@ -13,9 +13,9 @@ namespace herbie\plugin\feediting;
 
 use Herbie\DI;
 use Herbie\Hook;
-use Herbie\Loader\FrontMatterLoader;
-use Herbie\Menu;
-use Twig_SimpleFunction;
+//use Herbie\Loader\FrontMatterLoader;
+//use Herbie\Menu;
+//use Twig_SimpleFunction;
 
 if(!defined('DS')) define('DS', DIRECTORY_SEPARATOR);
 
@@ -389,17 +389,11 @@ class FeeditingPlugin
     private function renderEditableContent( $contentId, $content, $format, $twigify=false )
     {
         if($twigify) {
-
-            $herbieLoader = $this->app['twig']->environment->getLoader();
-            $this->app['twig']->environment->setLoader(new Twig_Loader_String());
-            $twigged = $this->app['twig']->environment->render(strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL )));
-            $this->app['twig']->environment->setLoader($herbieLoader);
-
-            $formatter = \Herbie\Formatter\FormatterFactory::create($format);
-            $content = strtr($formatter->transform($twigged), $this->replace_pairs);
+            $twigged = DI::get('Twig')->renderString(strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL )));
+            $rendered = Hook::trigger(Hook::FILTER, 'renderContent', $twigged, $this->page->getData());
+            $content = strtr($rendered, $this->replace_pairs);
 
         } else {
-
             $content = strtr($content, $this->replace_pairs);
         }
 

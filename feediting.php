@@ -91,22 +91,22 @@ class FeeditingPlugin
     }
 
     // fetch markdown-contents for jeditable
-    protected function onPageLoaded( $page )
+    protected function onPageLoaded( \Herbie\Page $page )
     {
-        // Disable Caching while editing
-        //$this->app['twig']->environment->setCache(false);
+        if($this->isEditable($page)){
+            // Disable Caching while editing
+            //$this->app['twig']->environment->setCache(false);
 
-        $this->page = $page;
+            $this->page = $page;
+            $this->cmd = @$_REQUEST['cmd'];
 
-        $this->cmd = @$_REQUEST['cmd'];
-
-        $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
-        $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
-        if( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))){
-            $this->cmd = $this->editableContent[$_segmentid]->{$this->cmd}();
+            $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
+            $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
+            if( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))){
+                $this->cmd = $this->editableContent[$_segmentid]->{$this->cmd}();
+            }
+            $this->editPage($_twigify);
         }
-
-        $this->editPage($_twigify);
     }
 
     protected function onWidgetLoaded(\Herbie\Event $event ){
@@ -158,7 +158,7 @@ class FeeditingPlugin
         }
     }
 
-    protected function editWidget($event){
+    protected function editWidget(\Herbie\Event $event){
 
         // Disable Caching while editing
         //$this->app['twig']->environment->setCache(false);
@@ -171,6 +171,19 @@ class FeeditingPlugin
         $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
 
         $this->editPage($_twigify);
+    }
+
+    private function isEditable(\Herbie\Page $page){
+
+        $path = $page->getPath();
+        $alias = substr($path, 0, strpos($path, '/'));
+        switch($alias){
+            case '@page':
+            case '@post':
+                return true;
+            default:
+                return false;
+        }
     }
 
     private function editPage($_twigify=false){
@@ -222,8 +235,9 @@ class FeeditingPlugin
                             $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
                         ));
 
-                        $ret = $this->app->renderContentSegment($changed['segmentid']);
-                        die($ret);
+                        $content = $this->page->getSegment($changed['segmentid']);
+                        $content = Hook::trigger(Hook::FILTER, 'renderContent', $content->string, $this->page->getData());
+                        die($content);
                     }
                 }
                 break;
@@ -388,14 +402,11 @@ class FeeditingPlugin
      */
     private function renderEditableContent( $contentId, $content, $format, $twigify=false )
     {
-        if($twigify) {
+        if($twigify && !empty($content)) {
             $twigged = DI::get('Twig')->renderString(strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL )));
-            $rendered = Hook::trigger(Hook::FILTER, 'renderContent', $twigged, $this->page->getData());
-            $content = strtr($rendered, $this->replace_pairs);
-
-        } else {
-            $content = strtr($content, $this->replace_pairs);
+            $content = Hook::trigger(Hook::FILTER, 'renderContent', $twigged, $this->page->getData());
         }
+        $content = strtr($content, $this->replace_pairs);
 
         return $this->editableContent[$contentId]->getEditableContainer($contentId, $content);
     }

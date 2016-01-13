@@ -298,7 +298,7 @@ class FeeditableContent {
         return $lineno;
     }
 
-    private function stripEmptyContentblocks()
+        private function stripEmptyContentblocks()
     {
         if(!is_array($this->blocks) || count($this->blocks)==0) return;
 

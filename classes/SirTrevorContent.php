@@ -86,8 +86,8 @@ class SirTrevorContent extends FeeditableContent {
         $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
         $this->plugin->includeBeforeBodyEnds('</form>');
 
-        $uploadPath = DIRECTORY_SEPARATOR.strtr($this->plugin->app['alias']->get($this->plugin->app['menuItem']->getRoute()),[
-            $this->plugin->app['alias']->get('@page') => ''
+         $uploadPath = DIRECTORY_SEPARATOR.strtr($this->plugin->alias->get(dirname($this->plugin->page->getPath())),[
+            $this->plugin->alias->get('@page') => ''
         ]);
 
         foreach($this->plugin->segments as $segmentid => $segment)

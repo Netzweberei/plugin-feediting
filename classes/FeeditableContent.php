@@ -118,8 +118,16 @@ class FeeditableContent {
      */
     public function setContent($content)
     {
-        // currently only (twitter-bootstrap)markdown supported!
-        $this->{'identify'.ucfirst($this->format).'Blocks'}($content);
+        switch($this->format){
+            case 'markdown':
+                // currently only (twitter-bootstrap)markdown supported!
+                $this->{'identify'.ucfirst($this->format).'Blocks'}($content);
+                break;
+
+            case 'raw':
+            default:
+                return;
+        }
 
         // strip empty blocks
         $this->stripEmptyContentblocks();
@@ -290,7 +298,7 @@ class FeeditableContent {
         return $lineno;
     }
 
-    private function stripEmptyContentblocks()
+        private function stripEmptyContentblocks()
     {
         if(!is_array($this->blocks) || count($this->blocks)==0) return;
 

@@ -43,6 +43,8 @@ class FeeditingPlugin
 
     private $cmd;
 
+    private $recursivePageLoads = 0;
+
     public function __construct()
     {
         $this->config = DI::get('Config');
@@ -93,7 +95,9 @@ class FeeditingPlugin
     // fetch markdown-contents for jeditable
     protected function onPageLoaded( \Herbie\Page $page )
     {
-        if($this->isEditable($page)){
+        $this->recursivePageLoads++;
+
+        if($this->recursivePageLoads <= 1 && $this->isEditable($page)){
             // Disable Caching while editing
             //$this->app['twig']->environment->setCache(false);
 
@@ -235,8 +239,8 @@ class FeeditingPlugin
                             $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
                         ));
 
-                        $content = $this->page->getSegment($changed['segmentid']);
-                        $content = Hook::trigger(Hook::FILTER, 'renderContent', $content->string, $this->page->getData());
+                        $segment = $this->page->getSegment($changed['segmentid']);
+                        $content = Hook::trigger(Hook::FILTER, 'renderContent', $segment->string, $this->page->getData());
                         die($content);
                     }
                 }

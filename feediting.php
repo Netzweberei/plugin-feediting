@@ -265,7 +265,7 @@ class FeeditingPlugin
         return (bool) @$_SESSION['LOGGED_IN'];
     }
 
-    protected function onOutputGenerated($response)
+    protected function onOutputGenerated(\Herbie\Http\Response $response)
     {
         $this->response = $response;
         $this->self = $this->config->get('plugins.path').'/feediting/';

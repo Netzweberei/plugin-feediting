@@ -69,6 +69,9 @@ class JeditableContent extends FeeditableContent {
 
     public function getEditablesJsConfig( $path=null )
     {
+        // also provide the 'spinner'
+        $this->plugin->provideAsset($path.'libs/jquery_jeditable-master/img/indicator.gif');
+        // Due to my basic programming skills, the files have to be included in reverse order!
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/simplemde/dist/simplemde.min.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
@@ -81,6 +84,15 @@ class JeditableContent extends FeeditableContent {
     {
         $blockSelector     = '.'.$this->pluginConfig['editable_prefix'].$this->format.'-'.$containerId;
         $segmentSelector   = '.'.$this->pluginConfig['contentSegment_WrapperPrefix'].$containerId;
+
+        $containerId = strtr($containerId, [
+           '[' => '',
+           ']' => ''
+        ]);
+        $blockSelector = strtr($blockSelector, [
+           '[' => '\\\[',
+           ']' => '\\\]'
+        ]);
 
         $ret =
 '<script type="text/javascript" charset="utf-8">

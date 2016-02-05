@@ -95,8 +95,8 @@ class SirTrevorContent extends FeeditableContent {
             $this->plugin->includeBeforeBodyEnds(
 '<script type="text/javascript" charset="utf-8">'.
 '
-      window.editor'.$segmentid.' = new SirTrevor.Editor({
-        el: $(".sirtrevor-'.$segmentid.'"),
+      window.editor'.strtr($segmentid, ['['=>'',']'=>'']).' = new SirTrevor.Editor({
+        el: $(".sirtrevor-'.strtr($segmentid, ['['=>'\\\[',']'=>'\\\]']).'"),
         blockTypes: [
           "Text",
           "Heading",
@@ -126,21 +126,21 @@ class SirTrevorContent extends FeeditableContent {
         }
     }
 
-    public function getEditableContainer($contentId, $content)
+    public function getEditableContainer($segmentId, $content)
     {
         $ret = '';
         $content = strtr($content, [
             PHP_EOL => ''
         ]);
 
-        if($contentId == 0) {
-            $ret .= '<div class="st-submit"><input type="submit" value="click to save changes" class="top" ><input type="hidden" name="id" value="sirtrevor-'.$contentId.'" ></input></div>';
+        if($segmentId == 0) {
+            $ret .= '<div class="st-submit"><input type="submit" value="click to save changes" class="top" ><input type="hidden" name="id" value="sirtrevor-'.$segmentId.'" ></input></div>';
         }
         if($this->plugin->cmd == 'editWidget'){
             $ret .= '<input type="hidden" name="cmd" value="saveWidget" />';
             $ret .= '<input type="hidden" name="name" value="'.$_REQUEST['name'].'" />';
         }
-        $ret .= '<textarea name="sirtrevor-'.$contentId.'" class="sirtrevor-'.$contentId.'">'.sprintf($this->contentContainer, $content).'</textarea>';
+        $ret .= '<textarea name="sirtrevor-'.$segmentId.'" class="sirtrevor-'.$segmentId.'">'.sprintf($this->contentContainer, $content).'</textarea>';
 
         $ret = strtr($ret, [
             'MARKDOWN_EOL'  => '<br>'
@@ -166,7 +166,7 @@ class SirTrevorContent extends FeeditableContent {
     }
 
     public function getSegment($eob=true){
-        return implode( $this->getEob(),  $this->blocks );
+        return parent::getSegment(true);
     }
 
     /**
@@ -180,17 +180,25 @@ class SirTrevorContent extends FeeditableContent {
         return null;
     }
 
-    public function setContentBlockById($id, $json){
+    /**
+     * @param $id of block i.e. segment
+     * @param $json new ST-content
+     * @return boolean success
+     */
+    public function setContentBlockById($id=false, $json){
 
-        if($this->blocks)
-        {
-            // replace current segment
-            $this->blocks = $this->json2array($json);
+        if($id){
+
+            // empty whole segment
+            $this->blocks = [];
+
+            // get data (from $_POST)
+            $replacement = implode($this->json2array($json));
 
             // Reindex all blocks
-            $modified = $this->plugin->renderRawContent(implode($this->getContent()), $this->getFormat(), true );
+            $newBlocks = $this->plugin->renderRawContent($replacement, $this->getFormat(), true );
 
-            $this->setContent($modified);
+            $this->setContentBlocks($newBlocks);
 
             return true;
         }

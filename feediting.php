@@ -45,18 +45,27 @@ class FeeditingPlugin
 
     private $recursivePageLoads = 0;
 
+    private $parseSubsegments = false;
+
+    private $subsegment_match = '/(-{2}\s+grid\s+.+?-{2})(.*?)(-{2}\s+grid\s+-{2})/msi';
+
+    private $subsegmentid_format = '%s[%s]';
+
     public function __construct()
     {
         $this->config = DI::get('Config');
-        $this->alias = DI::get('Alias');
+        $this->alias  = DI::get('Alias');
         $this->authenticated = $this->isAuthenticated();
     }
 
     public function install()
     {
-        Hook::attach('pluginsInitialized', [$this, 'onPluginsInitialized']);
-        Hook::attach('pageLoaded', [$this, 'onPageLoaded']);
-        Hook::attach('outputGenerated', [$this, 'onOutputGenerated']);
+        $adminpanelRequested = strpos(DI::get('Request')->getRequestUri(),'/adminpanel') === 0 ? true : false;
+        if(!$adminpanelRequested){
+            Hook::attach('pluginsInitialized', [$this, 'onPluginsInitialized']);
+            Hook::attach('pageLoaded', [$this, 'onPageLoaded']);
+            Hook::attach('outputGenerated', [$this, 'onOutputGenerated'],10);
+        }
     }
 
     public function onPluginsInitialized()
@@ -78,13 +87,32 @@ class FeeditingPlugin
             $this->config->set('plugins.config.feediting.dontProvideJquery', false);
         }
 
-        // set editor
-        switch($this->config->get('plugins.config.feediting.editor')){
+        // let the user decide, which editor to use
+        $userEditor = $this->config->get('plugins.config.feediting.editor');
+        if($userEditor == 'UserEditor' && isset($_GET['editor'])){
+            $_SESSION['NWeditor'] = $_GET['editor'];
+        }
+        switch(@$_SESSION['NWeditor']){
             case 'Htmlforms':
+                $userEditor = 'Feeditable';
+                break;
+            case 'SirTrevor':
+                $userEditor = 'SirTrevor';
+                break;
+            case 'Jeditable':
+            default:
+                $userEditor = 'Jeditable';
+        }
+
+        // set editor
+        switch($userEditor){
+            case 'Htmlforms':
+            case 'Feeditable':
                 $this->editor = 'Feeditable';
                 break;
             case 'SirTrevor':
                 $this->editor = 'SirTrevor';
+                $this->parseSubsegments = true;
                 break;
             default:
                 $this->editor = 'Jeditable';
@@ -92,25 +120,174 @@ class FeeditingPlugin
 
     }
 
-    // fetch markdown-contents for jeditable
     protected function onPageLoaded( \Herbie\Page $page )
     {
         $this->recursivePageLoads++;
+        if(
+            $this->isEditable($page)
+            && $this->recursivePageLoads <= 1
+        ){
 
-        if($this->recursivePageLoads <= 1 && $this->isEditable($page)){
             // Disable Caching while editing
-            //$this->app['twig']->environment->setCache(false);
+            DI::get('Twig')->getEnvironment()->setCache(false);
 
             $this->page = $page;
-            $this->cmd = @$_REQUEST['cmd'];
+            $this->cmd  = @$_REQUEST['cmd'];
 
-            $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
+            $segmentId = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
             $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
-            if( isset($_REQUEST['cmd']) && is_subclass_of($this->editableContent[$_segmentid], '\\herbie\plugin\\feediting\\classes\\FeeditableContent') && is_callable(array($this->editableContent[$_segmentid], $_REQUEST['cmd']))){
-                $this->cmd = $this->editableContent[$_segmentid]->{$this->cmd}();
+            if(
+                isset($_REQUEST['cmd'])
+                && in_array($segmentId, array_keys($this->editableContent))
+                && is_subclass_of($this->editableContent[$segmentId], '\\herbie\plugin\\feediting\\classes\\FeeditableContent')
+                && is_callable(array($this->editableContent[$segmentId], $_REQUEST['cmd']
+            ))){
+                $this->cmd = $this->editableContent[$segmentId]->{$this->cmd}();
             }
             $this->editPage($_twigify);
         }
+    }
+
+    private function isEditable(\Herbie\Page $page){
+
+        $path  = $page->getPath();
+        $alias = substr($path, 0, strpos($path, '/'));
+        switch($alias){
+            case '@page':
+            case '@post':
+                return true;
+        }
+        return false;
+    }
+
+    private function editPage($_twigify=false){
+
+        switch($this->cmd)
+        {
+            case 'save':
+            case 'saveAndReturn':
+                if( isset($_POST['id']) )
+                {
+                    $changed = $this->collectChanges();
+
+                    if( $changed['segmentid'] !== false )
+                    {
+                        $fheader = $this->getContentfileHeader();
+                        $fh = fopen($this->path, 'w');
+                        fputs($fh, $fheader);
+                        foreach($this->segments as $segmentId => $segmentContents){
+                            $_modifiedContent[$segmentId] = '';
+                            if( $segmentId != '0' ) {
+                                fputs($fh, PHP_EOL."--- {$segmentId} ---".PHP_EOL);
+                            }
+                            if(is_array($segmentContents)){
+                                foreach($segmentContents as $subsegmentId => $subsegmentContent){
+                                    $subsegmentId = sprintf($this->subsegmentid_format, $segmentId, $subsegmentId);
+                                    if(in_array($subsegmentId, array_keys($this->editableContent))){
+                                        $_modifiedContent[$segmentId] .= $this->renderRawContent($this->editableContent[$subsegmentId]->getSegment(false), $this->editableContent[$subsegmentId]->getFormat(), true );
+                                    } else {
+                                        $_modifiedContent[$segmentId] .= $subsegmentContent;
+                                    }
+                                }
+                            }
+                            else{
+                                $_modifiedContent[$segmentId] = $this->renderRawContent($this->editableContent[$segmentId]->getSegment(false), $this->editableContent[$segmentId]->getFormat(), true );
+                            }
+                            fputs($fh, $_modifiedContent[$segmentId]);
+                        }
+                        fclose($fh);
+                    }
+
+                    if($this->cmd == 'saveAndReturn') {
+                        return;
+                    }
+
+                    $this->cmd = 'reload';
+
+                    $this->page->load($this->page->getPath());
+                    $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
+
+                    if($this->editableContent[$changed['segmentid']]->reloadPageAfterSave === false) {
+                        // deliver partial content for ajax-request
+                        $editable_segment = $this->editableContent[$changed['segmentid']]->getSegment();
+
+                        // render feeditable contents
+                        $this->page->setSegments(array(
+                                $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
+                            ));
+
+                        $segment = $this->page->getSegment($changed['segmentid']);
+                        $content = Hook::trigger(Hook::FILTER, 'renderContent', $segment->string, $this->page->getData());
+                        die($content);
+                    }
+
+                    foreach($this->segments as $id => $_segment){
+                        $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
+                    }
+                    $this->page->setSegments($this->segments);
+                    break;
+
+                }
+                break;
+            case 'bypass':
+                break;
+            default:
+                foreach($this->segments as $id => $_segment){
+                    if(is_array($_segment)){
+                        // subsegments found!
+                        $this->segments[$id] = '';
+//                        die(var_dump(array_keys($this->editableContent)));
+                        foreach($_segment as $subCtr => $_subsegment){
+                            $_subsegmentid = sprintf($this->subsegmentid_format, $id, $subCtr);
+                            if(
+                                in_array($_subsegmentid, array_keys($this->editableContent))
+                                && is_subclass_of($this->editableContent[$_subsegmentid], 'herbie\plugin\feediting\classes\FeeditableContent')
+                              ){
+                                $this->segments[$id] .= $this->renderEditableContent($_subsegmentid, $_subsegment, 'markdown', $_twigify);
+                                $this->segments[$_subsegmentid] = true;
+                            } else {
+                                $this->segments[$id] .= $this->renderContent($_subsegmentid, $_subsegment, 'markdown', false);
+                            }
+                        }
+                    } else {
+                        $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
+                    }
+                }
+        }
+
+        $this->setPageSegments();
+    }
+
+    protected function setPageSegments()
+    {
+        $segments = [];
+        foreach($this->segments as $segmentId => $editableContainer){
+            if( count($mainAndSub = explode('_', $segmentId)) > 1 ){
+                $segments[$mainAndSub[0]] .= $editableContainer;
+            } else {
+                $segments[$segmentId] = $editableContainer;
+            }
+        }
+        $this->page->setSegments($segments);
+        $this->page->nocache = true;
+    }
+
+    protected function onOutputGenerated($response)
+    {
+
+        $this->response = $response;
+        $this->self = $this->config->get('plugins.path').'/feediting/';
+
+        if('UserEditor' == $this->config->get('plugins.config.feediting.editor')){
+            $this->includeIntoAdminpanel('<div class="feeditingpanel"><a name="FeditableContent">Choose editor:</a><a href="/?editor=SirTrevor">SirTrevor</a><a href="/?editor=Jeditable">Jeditable</a></div>');
+        }
+        $this->includeIntoHeader($this->self.'assets/css/feediting.css');
+        $this->getEditablesCssConfig($this->self);
+        $this->getEditablesJsConfig($this->self);
+
+        $response->setContent(
+            strtr($response->getContent(), $this->replace_pairs)
+        );
     }
 
     protected function onWidgetLoaded(\Herbie\Event $event ){
@@ -171,93 +348,9 @@ class FeeditingPlugin
         $this->alias = $this->app['alias'];
         $this->path  = $this->alias->get($event->offsetGet('widgetPath'));
 
-        $_segmentid = ( isset($_REQUEST['segmentid']) ) ? $_REQUEST['segmentid'] : '0';
         $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
 
         $this->editPage($_twigify);
-    }
-
-    private function isEditable(\Herbie\Page $page){
-
-        $path = $page->getPath();
-        $alias = substr($path, 0, strpos($path, '/'));
-        switch($alias){
-            case '@page':
-            case '@post':
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    private function editPage($_twigify=false){
-
-        switch($this->cmd)
-        {
-            case 'save':
-            case 'saveAndReturn':
-
-                if( isset($_POST['id']) )
-                {
-                    $changed = $this->collectChanges();
-
-                    if( $changed['segmentid'] !== false )
-                    {
-                        $fheader = $this->getContentfileHeader();
-                        $fh = fopen($this->path, 'w');
-                        fputs($fh, $fheader);
-                        foreach($this->segments as $segmentid => $_staticContent){
-                            if( $segmentid != '0' ) {
-                                fputs($fh, PHP_EOL."--- {$segmentid} ---".PHP_EOL);
-                            }
-                            $_modifiedContent[$segmentid] = $this->renderRawContent($this->editableContent[$segmentid]->getSegment(false), $this->editableContent[$segmentid]->getFormat(), true );
-                            fputs($fh, $_modifiedContent[$segmentid]);
-                        }
-                        fclose($fh);
-                    }
-
-                    if($this->cmd == 'saveAndReturn') return;
-                    $this->cmd = 'reload';
-
-                    $this->page->load($this->page->getPath());
-                    $_twigify   = ( $this->loadEditableSegments()=='twigify' ) ? true : false;
-
-                    if($this->editableContent[$changed['segmentid']]->reloadPageAfterSave === true)
-                    {
-                        foreach($this->segments as $id => $_segment){
-                            $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
-                        }
-                        $this->page->setSegments($this->segments);
-                        break;
-                    }
-                    else // deliver partial content for ajax-request
-                    {
-                        $editable_segment = $this->editableContent[$changed['segmentid']]->getSegment();
-
-                        // render feeditable contents
-                        $this->page->setSegments(array(
-                            $changed['segmentid'] => $this->renderEditableContent($changed['segmentid'], $editable_segment, $changed['contenttype'], $_twigify)
-                        ));
-
-                        $segment = $this->page->getSegment($changed['segmentid']);
-                        $content = Hook::trigger(Hook::FILTER, 'renderContent', $segment->string, $this->page->getData());
-                        die($content);
-                    }
-                }
-                break;
-
-            case 'bypass':
-                break;
-
-            default:
-
-                foreach($this->segments as $id => $_segment){
-                    $this->segments[$id] = $this->renderEditableContent($id, $_segment, 'markdown', $_twigify);
-                }
-        }
-
-        $this->page->setSegments($this->segments);
-        $this->page->nocache = true;
     }
 
     protected function isAuthenticated()
@@ -265,23 +358,8 @@ class FeeditingPlugin
         return (bool) @$_SESSION['LOGGED_IN'];
     }
 
-    protected function onOutputGenerated(\Herbie\Http\Response $response)
-    {
-        $this->response = $response;
-        $this->self = $this->config->get('plugins.path').'/feediting/';
-
-        $this->getEditablesCssConfig($this->self);
-        $this->getEditablesJsConfig($this->self);
-
-        $response->setContent(
-            strtr($response->getContent(), $this->replace_pairs)
-        );
-    }
-
     private function includeIntoTag($tag=null, $uri)
     {
-        $ensureSrcExits = false;
-
         if(empty($tag)) return;
 
         if(!isset($this->replace_pairs[$tag]))
@@ -299,36 +377,15 @@ class FeeditingPlugin
         }
         else
         {
-            // include a path:
-            $ref = 'src';
-            $filename   = basename($uri);
-            $fileAtoms  = explode('.',basename($filename));
-            $webdir    = strtr(dirname($uri), array(
-                $this->alias->get('@plugin') => ''
-            ));
-
-            if( strpos($webdir, '://') > 1 ) {
-                $pathPrefix = '';
-            } else {
-                $pathPrefix = DS.'assets';
-
-                // copy src to assets
-                $webpath = $pathPrefix.$webdir.DS.$filename;
-                $abspath = $this->alias->get('@web').$webpath;
-                if(!file_exists($abspath)){
-                    @mkdir(dirname($abspath), 0777, true);
-                    copy($uri, $abspath);
-                }
-            }
-
-            switch(end($fileAtoms))
+            $assetAtoms = $this->provideAsset($uri);
+            switch(end($assetAtoms))
             {
-                case 'css':
+                case '.css':
                     $tmpl = '<link rel="stylesheet" href="%s" type="text/css" media="screen" title="no title" charset="utf-8">';
                     break;
 
-                case 'js':
-                    $tmpl = '<script '.$ref.'="%s" type="text/javascript" charset="utf-8"></script>';
+                case '.js':
+                    $tmpl = '<script src="%s" type="text/javascript" charset="utf-8"></script>';
                     break;
 
                 default:
@@ -336,7 +393,7 @@ class FeeditingPlugin
             }
         }
 
-        $this->replace_pairs[$tag] = sprintf($tmpl, $pathPrefix.$webdir.DS.$filename).PHP_EOL.$this->replace_pairs[$tag];
+        $this->replace_pairs[$tag] = sprintf($tmpl, implode($assetAtoms)).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     private function getReplacement($mark){
@@ -352,11 +409,13 @@ class FeeditingPlugin
     }
     
     private function getEditablesCssConfig( $pluginPath ){
-        return $this->editableContent[0]->getEditablesCssConfig( $pluginPath );
+        $validKeys = array_keys($this->editableContent);
+        $this->editableContent[$validKeys[0]]->getEditablesCssConfig( $pluginPath );
     }
 
     private function getEditablesJsConfig( $pluginPath ){
-        return $this->editableContent[0]->getEditablesJsConfig( $pluginPath );
+        $validKeys = array_keys($this->editableContent);
+        $this->editableContent[$validKeys[0]]->getEditablesJsConfig( $pluginPath );
     }
 
     private function loadEditableSegments(){
@@ -367,21 +426,41 @@ class FeeditingPlugin
             $this->segments = array_merge(array('0' => PHP_EOL), $this->segments);
         }
 
-        foreach($this->segments as $segmentid => $_staticContent)
+        foreach($this->segments as $segmentId => $segmentContents)
         {
             $contentEditor = "herbie\\plugin\\feediting\\classes\\{$this->editor}Content";
-            $this->editableContent[$segmentid] = new $contentEditor($this, $this->page->format, $segmentid);
 
-            if(trim($_staticContent)=='' || trim($_staticContent)==PHP_EOL)
+            // special case: segment with "subsegments"
+            preg_match($this->subsegment_match, $segmentContents, $gridcontent);
+            // @todo: test with multiple grids!
+            if($this->parseSubsegments && isset($gridcontent[2]))
             {
-                $_staticContent = $this->editableContent[$segmentid]->editableEmptySegmentContent;
+                $this->segments[$segmentId] = array($gridcontent[1]);
+                $cols = preg_split('/\\n+--\\n+/', $gridcontent[2]);
+                $offset = 0;
+                foreach($cols as $col => $colcontent)
+                {
+                    if($col > 0) {
+                        $this->segments[$segmentId][] = PHP_EOL.'--'.PHP_EOL;
+                    }
+                    $subsegmentId = sprintf($this->subsegmentid_format, $segmentId, count($this->segments[$segmentId]));
+                    $this->editableContent[$subsegmentId] = new $contentEditor($this, $this->page->format, $subsegmentId);
+                    $offset = $this->editableContent[$subsegmentId]->setContentBlocks($colcontent, $offset);
+
+                    $this->segments[$segmentId][] = $this->editableContent[$subsegmentId]->getSegment();
+                }
+                $this->segments[$segmentId][] = PHP_EOL.'-- grid --'.PHP_EOL;
             }
+            else
+            {
+                $this->editableContent[$segmentId] = new $contentEditor($this, $this->page->format, $segmentId);
+                $this->editableContent[$segmentId]->setContentBlocks($segmentContents);
+                $this->segments[$segmentId] = $this->editableContent[$segmentId]->getSegment();
+            }
+        }
 
-            $this->editableContent[$segmentid]->setContent($_staticContent);
-            $this->segments[$segmentid] = $this->editableContent[$segmentid]->getSegment();
-        };
-
-        return $this->editableContent[$segmentid]->getSegmentLoadedMsg();
+        // use one of segments for common tasks
+        return $this->editableContent[$segmentId]->getSegmentLoadedMsg();
     }
 
     /**
@@ -404,32 +483,79 @@ class FeeditingPlugin
      * @param string $format, eg. 'markdown'
      * @return string
      */
-    private function renderEditableContent( $contentId, $content, $format, $twigify=false )
+    private function renderContent( $contentId, $content, $format, $twigify=false )
     {
         if($twigify && !empty($content)) {
-            $twigged = DI::get('Twig')->renderString(strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL )));
-            $content = Hook::trigger(Hook::FILTER, 'renderContent', $twigged, $this->page->getData());
+            //$content = DI::get('Twig')->renderString($content);
+            $content = strtr($content, array( constant(strtoupper($format).'_EOL') => PHP_EOL ));
+            $content = Hook::trigger(Hook::FILTER, 'renderContent', $content, $this->page->getData());
         }
-        $content = strtr($content, $this->replace_pairs);
-
-        return $this->editableContent[$contentId]->getEditableContainer($contentId, $content);
+        return $content;
     }
 
-    private function defineLineFeed($format, $eol)
+    /**
+     * @param string $content
+     * @param string $format, eg. 'markdown'
+     * @return string
+     */
+    private function renderEditableContent( $contentId, $content, $format, $twigify=false )
     {
-        $FORMAT_EOL = $this->getLineFeedMarker($format);
-        $EDITABLE_FORMAT_EOL = $this->getLineFeedMarker($format, 1);
-        // used for saving
-        if(!defined($FORMAT_EOL)) define($FORMAT_EOL, $eol);
-        // used in in-page-editor
-        if(!defined($EDITABLE_FORMAT_EOL)) define($EDITABLE_FORMAT_EOL, $eol);
-
-        $this->replace_pairs[$eol] = '';
-        $this->remove_pairs[$eol] = '';
+        $ret = '';
+        $content = $this->renderContent($contentId, $content, $format, $twigify);
+        if(is_array($content)){
+            foreach($content as $subcontentId => $subcontent){
+                $subsegmentId = sprintf($this->subsegmentid_format, $contentId, $subcontentId);
+                if(isset($this->editableContent[$subsegmentId])){
+                    $ret .= $this->editableContent[$subsegmentId]->getEditableContainer($subsegmentId,strtr($subcontent, $this->replace_pairs));
+                    $this->segments[$subsegmentId] = true;
+                } else {
+                    $ret .= strtr($subcontent, $this->replace_pairs);
+                }
+            }
+        } elseif(isset($this->editableContent[$contentId])){
+            $ret = $this->editableContent[$contentId]->getEditableContainer($contentId,strtr($content, $this->replace_pairs));
+        }
+        return $ret;
     }
 
-    public function getLineFeedMarker($format, $editable=false){
-        return ($editable ? 'EDITABLE_' : '').strtoupper($format).'_EOL';
+    private function collectChanges(){
+
+        $anyEditor = reset($this->editableContent);
+        $posted = $anyEditor->decodeEditableId($_POST['id']);
+
+        $this->replace_pairs = [];
+        if($this->editableContent[$posted['segmentid']]->collectAllChanges === true)
+        {
+            foreach($this->editableContent as $segmentId => $segmentContent)
+            {
+                $elemId = $this->editableContent[$segmentId]->encodeEditableId($segmentId);
+                $subElemId = false;
+                if(preg_match('/(.*)\[(.*)\]/', $elemId, $test)){
+                    list($domId, $elemId, $subElemId) = $test;
+                }
+
+                if($subElemId && $_POST[$elemId][$subElemId]){
+                    if(!$this->editableContent[$segmentId]->setContentBlockById($segmentId, (string) $_POST[$elemId][$subElemId])){
+                        return false;
+                    }
+                }
+                elseif($_POST[$elemId]) {
+                    if(!$this->editableContent[$segmentId]->setContentBlockById($elemId, (string) $_POST[$elemId])){
+                        return false;
+                    }
+                }
+            }
+        } else {
+            if(!$this->editableContent[$posted['segmentid']]->setContentBlockById($posted['elemid'], (string) $_POST['value'])){
+                return false;
+            }
+        }
+
+        return array(
+            'elemid'        => $posted['elemid'],
+            'segmentid'     => $posted['segmentid'],
+            'contenttype'   => $posted['contenttype']
+        );
     }
 
     private function getContentfileHeader()
@@ -459,37 +585,21 @@ class FeeditingPlugin
         return $fheader;
     }
 
-    private function collectChanges(){
+    private function defineLineFeed($format, $eol)
+    {
+        $FORMAT_EOL = $this->getLineFeedMarker($format);
+        $EDITABLE_FORMAT_EOL = $this->getLineFeedMarker($format, 1);
+        // used for saving
+        if(!defined($FORMAT_EOL)) define($FORMAT_EOL, $eol);
+        // used in in-page-editor
+        if(!defined($EDITABLE_FORMAT_EOL)) define($EDITABLE_FORMAT_EOL, $eol);
 
-        if(!$this->editableContent[0]){
-            return false;
-        }
+        $this->replace_pairs[$eol] = '';
+        $this->remove_pairs[$eol] = '';
+    }
 
-        $posted = $this->editableContent[0]->decodeEditableId($_POST['id']);
-        $this->replace_pairs = [];
-
-        if($this->editableContent[$posted['segmentid']]->collectAllChanges === true)
-        {
-            foreach($this->editableContent as $_segmentid => $_segmentcontent)
-            {
-                $_elemid = $this->editableContent[$_segmentid]->encodeEditableId($_segmentid);
-                if(!$_POST[$_elemid] || !$this->editableContent[$_segmentid]->setContentBlockById($_elemid, (string) $_POST[$_elemid])){
-                    return false;
-                }
-            }
-        }
-        else
-        {
-            if(!$this->editableContent[$posted['segmentid']]->setContentBlockById($posted['elemid'], (string) $_POST['value'])){
-                return false;
-            }
-        }
-
-        return array(
-            'elemid'        => $posted['elemid'],
-            'segmentid'     => $posted['segmentid'],
-            'contenttype'   => $posted['contenttype']
-        );
+    public function getLineFeedMarker($format, $editable=false){
+        return ($editable ? 'EDITABLE_' : '').strtoupper($format).'_EOL';
     }
 
     public function getConfig(){
@@ -501,6 +611,11 @@ class FeeditingPlugin
         $this->includeIntoTag('</head>', $uri);
     }
 
+    public function includeIntoAdminpanel($html){
+        $adminpanelTag = '<div class="adminpanel">';
+        $this->replace_pairs[$adminpanelTag] = '<div class="adminpanel">'.$html;
+    }
+
     public function includeAfterBodyStarts($uri){
         $matches = array(1 => '<body>'); // set default match, overwritten if regex finds something
         preg_match('/(<body[^>]*>)/', $this->response->getContent(), $matches);
@@ -509,6 +624,29 @@ class FeeditingPlugin
 
     public function includeBeforeBodyEnds($uri){
         $this->includeIntoTag('</body>', $uri);
+    }
+
+    public function provideAsset($uri){
+        // include a path:
+        $pathinfo = pathinfo($uri);
+        $webdir    = strtr(dirname($uri), array(
+                $this->alias->get('@plugin') => ''
+            ));
+
+        if( strpos($webdir, '://') > 1 ) {
+            $pathPrefix = '';
+        } else {
+            $pathPrefix = DS.'assets';
+
+            // copy src to assets
+            $webpath = $pathPrefix.$webdir.DS.$pathinfo['basename'];
+            $abspath = $this->alias->get('@web').$webpath;
+            if(!file_exists($abspath)){
+                @mkdir(dirname($abspath), 0777, true);
+                copy($uri, $abspath);
+            }
+        }
+        return [$pathPrefix,$webdir.DS,$pathinfo['filename'],'.'.$pathinfo['extension']];
     }
 
     public function __get($attrib){
@@ -528,7 +666,7 @@ class FeeditingPlugin
 
     public function __call($funcname, $args)
     {
-        if($this->authenticated === true && DI::get('Request')->getRequestUri() != '/adminpanel' ){
+        if($this->authenticated === true ){
             switch(count($args)){
                 case 5:
                     return $this->{$funcname}($args[0], $args[1], $args[2], $args[3], $args[4]);

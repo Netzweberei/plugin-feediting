@@ -1,5 +1,7 @@
 .feeditingpanel {
     float: right;
+    right: 2em;
+    position: relative;
 }
 .adminpanel {
     position: fixed;

@@ -13,7 +13,8 @@ namespace herbie\plugin\feediting\classes;
 
 use herbie\plugin\feediting\FeeditingPlugin;
 
-class JeditableContent extends FeeditableContent {
+class JeditableContent extends FeeditableContent
+{
 
     public $reloadPageAfterSave = false;
 
@@ -34,7 +35,8 @@ class JeditableContent extends FeeditableContent {
 
     protected $segmentLoadedMsg = 'twigify';
 
-    public function load(){
+    public function load()
+    {
 
         extract($this->decodeEditableId($_REQUEST['id']));
 
@@ -43,80 +45,89 @@ class JeditableContent extends FeeditableContent {
         die($ret);
     }
 
-    public function save(){
+    public function save()
+    {
         return 'save';
     }
 
-    public function getEditableContainer($contentId, $content){
+    public function getEditableContainer($contentId, $content)
+    {
 
-        if($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave){
+        if ($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave) {
             return
-                '<div class="'.$this->pluginConfig['contentSegment_WrapperPrefix'].$contentId.'">
-                '.
-                $content.
-                $this->setJSEditableConfig($contentId).
+                '<div class="' . $this->pluginConfig['contentSegment_WrapperPrefix'] . $contentId . '">
+                ' .
+                $content .
+                $this->setJSEditableConfig($contentId) .
                 '
                 </div>';
         }
 
-        $this->plugin->includeBeforeBodyEnds($this->setJSEditableConfig( $this->segmentid ));
+        $this->plugin->includeBeforeBodyEnds($this->setJSEditableConfig($this->segmentid));
         return $content;
     }
 
-    public function getEditablesCssConfig($path=null){
-        $this->plugin->includeIntoHeader($path.'libs/simplemde/dist/simplemde.min.css');
-    }
-
-    public function getEditablesJsConfig( $path=null )
+    protected function setJSEditableConfig($containerId = 0)
     {
-        // also provide the 'spinner'
-        $this->plugin->provideAsset($path.'libs/jquery_jeditable-master/img/indicator.gif');
-        // Due to my basic programming skills, the files have to be included in reverse order!
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
-        $this->plugin->includeBeforeBodyEnds($path.'libs/simplemde/dist/simplemde.min.js');
-        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.js');
-        if(false === $this->pluginConfig['dontProvideJquery']) {
-            $this->plugin->includeBeforeBodyEnds($path.'libs/jquery/jquery-1.8.2.js');
-        }
-    }
+        $blockSelector = '.' . $this->pluginConfig['editable_prefix'] . $this->format . '-' . $containerId;
+        $segmentSelector = '.' . $this->pluginConfig['contentSegment_WrapperPrefix'] . $containerId;
 
-    protected function setJSEditableConfig( $containerId = 0 )
-    {
-        $blockSelector     = '.'.$this->pluginConfig['editable_prefix'].$this->format.'-'.$containerId;
-        $segmentSelector   = '.'.$this->pluginConfig['contentSegment_WrapperPrefix'].$containerId;
-
-        $containerId = strtr($containerId, [
-           '[' => '',
-           ']' => ''
-        ]);
-        $blockSelector = strtr($blockSelector, [
-           '[' => '\\\[',
-           ']' => '\\\]'
-        ]);
+        $containerId = strtr(
+            $containerId,
+            [
+                '[' => '',
+                ']' => ''
+            ]
+        );
+        $blockSelector = strtr(
+            $blockSelector,
+            [
+                '[' => '\\\[',
+                ']' => '\\\]'
+            ]
+        );
 
         $ret =
-'<script type="text/javascript" charset="utf-8">
-function withContainer'.ucfirst($containerId).'() {
-    $("'.$blockSelector.'").editable("?cmd=save&renderer=markdown", {
+            '<script type="text/javascript" charset="utf-8">
+            function withContainer' . ucfirst($containerId) . '() {
+    $("' . $blockSelector . '").editable("?cmd=save&renderer=markdown", {
         indicator : "<img src=\'/assets/feediting/libs/jquery_jeditable-master/img/indicator.gif\'>",
-        loadurl   : "?cmd=load&segmentid='.$containerId.'&renderer=markdown",
+        loadurl   : "?cmd=load&segmentid=' . $containerId . '&renderer=markdown",
         type      : "simplemde",
         submit    : "OK",
         cancel    : "Cancel",
         tooltip   : "Click to edit...",
         ajaxoptions : {
             replace : "with",
-            container : "'.$segmentSelector.'",
-            run: "withContainer'.ucfirst($containerId).'();"
+            container : "' . $segmentSelector . '",
+            run: "withContainer' . ucfirst($containerId) . '();"
         }
     });
 };
 
 $(document).ready(function(){
-    withContainer'.ucfirst($containerId).'();
+    withContainer' . ucfirst($containerId) . '();
 });
 </script>';
 
         return $ret;
+    }
+
+    public function getEditablesCssConfig($path = null)
+    {
+        $this->plugin->includeIntoHeader($path . 'libs/simplemde/dist/simplemde.min.css');
+    }
+
+    public function getEditablesJsConfig($path = null)
+    {
+        // also provide the 'spinner'
+        $this->plugin->provideAsset($path . 'libs/jquery_jeditable-master/img/indicator.gif');
+        // Due to my basic programming skills, the files have to be included in reverse order!
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/simplemde/dist/simplemde.min.js');
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_jeditable-master/jquery.jeditable.js');
+        if (false === $this->pluginConfig['dontProvideJquery']) {
+            $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery/jquery-1.8.2.js');
+        }
     }
 }

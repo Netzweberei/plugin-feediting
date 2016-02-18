@@ -60,7 +60,9 @@ class FeeditableContent
         if ($segmentid) {
             $this->segmentid = $segmentid;
         }
-        if ($eob) $this->eob = $eob;
+        if ($eob) {
+            $this->eob = $eob;
+        }
 
         $this->init();
 
@@ -118,16 +120,6 @@ class FeeditableContent
         );
     }
 
-    public function getFormat()
-    {
-        return $this->format;
-    }
-
-    public function getEob()
-    {
-        return $this->eob;
-    }
-
     public function getSegment($eob = true)
     {
         if ($eob) {
@@ -139,31 +131,9 @@ class FeeditableContent
         return $content;
     }
 
-    /**
-     * @param string $content
-     * @param int $uid
-     * @return array('blocks', 'eop', 'format')
-     */
-    public function setContentBlocks($content, $startWithBlockId = 0, $segmentId = false)
+    public function getEob()
     {
-        // replace empty content
-        if(trim($content)=='' || trim($content)==PHP_EOL){
-            $content = $this->editableEmptySegmentContent;
-        }
-
-        // fresh start or just apppend something?
-        if(!$startWithBlockId){
-            $this->blocks = [];
-        }
-
-        switch ($this->format) {
-                // currently only markdown supported
-            case 'markdown':
-                $this->{'identify' . ucfirst($this->format) . 'Blocks'}($content, $startWithBlockId, $segmentId);
-            case 'raw':
-            default:
-                // do nothing (yet)
-        }
+        return $this->eob;
     }
 
     public function getContent()
@@ -191,6 +161,38 @@ class FeeditableContent
         return false;
     }
 
+    public function getFormat()
+    {
+        return $this->format;
+    }
+
+    /**
+     * @param string $content
+     * @param int $uid
+     * @return array('blocks', 'eop', 'format')
+     */
+    public function setContentBlocks($content, $startWithBlockId = 0, $segmentId = false)
+    {
+        // replace empty content
+        if (trim($content) == '' || trim($content) == PHP_EOL) {
+            $content = $this->editableEmptySegmentContent;
+        }
+
+        // fresh start or just apppend something?
+        if (!$startWithBlockId) {
+            $this->blocks = [];
+        }
+
+        switch ($this->format) {
+            // currently only markdown supported
+            case 'markdown':
+                $this->{'identify' . ucfirst($this->format) . 'Blocks'}($content, $startWithBlockId, $segmentId);
+            case 'raw':
+            default:
+                // do nothing (yet)
+        }
+    }
+
     public function getSegmentLoadedMsg()
     {
         return $this->segmentLoadedMsg;
@@ -198,10 +200,11 @@ class FeeditableContent
 
     public function encodeEditableId($elemId)
     {
-        if (!($this->pluginConfig['editable_prefix'] && $this->format && $this->segmentid))
+        if (!($this->pluginConfig['editable_prefix'] && $this->format && $this->segmentid)) {
             return false;
-        else
+        } else {
             return $this->pluginConfig['editable_prefix'] . $this->format . '-' . $this->segmentid . '#' . $elemId;
+        }
     }
 
     public function decodeEditableId($elemuri)
@@ -241,7 +244,7 @@ class FeeditableContent
         $eol = PHP_EOL;
         $class = $this->pluginConfig['editable_prefix'] . $this->format . '-' . $segmentId;
         $openBlock = true;
-        $blockId = 0;
+        $blockId = false;
 
         // prepare for indexing
         $content = $this->stripEmptyContentblocks($content);
@@ -267,7 +270,7 @@ class FeeditableContent
                 // looking for special content which need its own block
                 if ($b_type != 'textBlock' && preg_match($b_def['mdregex'], $line, $test)) {
                     // if a "normal" block of multiple lines is still open, we close it
-                    if ($blockId) {
+                    if ($blockId !== false) {
                         $this->blocks[$blockId + 1] = ($segmentId === false) ? '' : $this->insertEditableTag(
                             $blockId,
                             $class,
@@ -275,7 +278,7 @@ class FeeditableContent
                             $b_type,
                             MARKDOWN_EOL
                         );
-                        $blockId = 0;
+                        $blockId = false;
                         $openBlock = true;
                     }
 
@@ -287,7 +290,9 @@ class FeeditableContent
                     if ($b_def['template'] !== '') {
                         // build special block
                         preg_match($b_def['dataregex'], $line, $b_data);
-                        if (count($b_data) > 1) array_shift($b_data);
+                        if (count($b_data) > 1) {
+                            array_shift($b_data);
+                        }
                         switch ($b_def['insert']) {
                             case 'inline':
                                 $this->blocks[$lineno] = $this->insertEditableTag(
@@ -391,17 +396,15 @@ class FeeditableContent
                 && $blockContents == ''
                 && $stripped[$lastBlockUid] == ''
 //                && $stripped[$beforeLastBlockUid] == ''
-            ){
+            ) {
                 continue;
-            }
-            else
-            {
+            } else {
                 $stripped[$blockUid] = $blockContents;
             }
             $beforeLastBlockUid = $lastBlockUid;
             $lastBlockUid = $blockUid;
         }
-        return implode(PHP_EOL,$stripped);
+        return implode(PHP_EOL, $stripped);
     }
 
     private function calcLineIndex($ctr, $offset, $segmentId = false)

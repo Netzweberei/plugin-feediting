@@ -1,0 +1,22 @@
+.feeditingpanel {
+    float: right;
+    right: 2em;
+    position: relative;
+}
+.adminpanel {
+    position: fixed;
+    z-index: 999;
+    width: 100%;
+    height: 34px;
+    padding: 28px 7px;
+    top: 0;
+    left: 0;
+}
+
+.adminpanel + div,header {
+    margin-top: 34px;
+}
+
+.editor-toolbar.fullscreen {
+    z-index: 1000;
+}

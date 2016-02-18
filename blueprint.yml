@@ -1,0 +1,4 @@
+feediting:
+  editor: UserEditor
+  bodyTag: '<body class="{{ bodyclass() }}">'
+  contentSegment_WrapperPrefix: feeditable-

@@ -12,6 +12,7 @@
 namespace herbie\plugin\feediting\classes;
 
 use herbie\plugin\feediting\FeeditingPlugin;
+use Herbie\DI;
 
 class SirTrevorContent extends FeeditableContent
 {
@@ -42,6 +43,7 @@ class SirTrevorContent extends FeeditableContent
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\!\[/',
             "dataregex" => '/(^.*\((.*)\).*$)/',
+            "editingMaskMap" => ['/site' => '@site'],
             "insert" => 'inlineButWriteRegex0'
         ],
         "smartyimageBlock" => [
@@ -299,12 +301,14 @@ class SirTrevorContent extends FeeditableContent
 
         if ($_FILES) {
 
-            $uploaddir = dirname($this->plugin->app['alias']->get($this->plugin->app['menuItem']->getPath()));
+            $pwd = DI::get('Alias')->get(DI::get('Page')->getPath());
+            $uploaddir = dirname($pwd);
 
             $uploadfile = filter_var(
                 $uploaddir . DS . basename($_FILES['attachment']['name']['file']),
                 FILTER_SANITIZE_URL
             );
+
             if (move_uploaded_file($_FILES['attachment']['tmp_name']['file'], $uploadfile)) {
                 $relpath = strtr($uploadfile, array($this->plugin->alias->get('@site') => '/site'));
                 $sirtrevor = '{ "file": { "url" : "' . $relpath . '" } }';

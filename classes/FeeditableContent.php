@@ -12,6 +12,7 @@
 namespace herbie\plugin\feediting\classes;
 
 use herbie\plugin\feediting\FeeditingPlugin;
+use Herbie\DI;
 
 class FeeditableContent
 {

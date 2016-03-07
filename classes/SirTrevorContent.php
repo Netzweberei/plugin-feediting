@@ -310,7 +310,7 @@ class SirTrevorContent extends FeeditableContent
             );
 
             if (move_uploaded_file($_FILES['attachment']['tmp_name']['file'], $uploadfile)) {
-                $relpath = strtr($uploadfile, array($this->plugin->alias->get('@site') => '/site'));
+                $relpath = strtr($uploadfile, array($this->plugin->alias->get('@site') => '@site'));
                 $sirtrevor = '{ "file": { "url" : "' . $relpath . '" } }';
                 die($sirtrevor);
             }

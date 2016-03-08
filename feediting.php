@@ -98,25 +98,25 @@ class FeeditingPlugin
         }
 
         // let the user decide, which editor to use
-        $userEditor = $this->config->get('plugins.config.feediting.editor');
-        if ($userEditor == 'UserEditor' && isset($_GET['editor'])) {
+        $this->userEditor = $this->config->get('plugins.config.feediting.editor');
+        if ($this->userEditor == 'UserEditor' && isset($_GET['editor'])) {
             $_SESSION['NWeditor'] = $_GET['editor'];
         }
         switch (@$_SESSION['NWeditor']) {
             case 'Htmlforms':
-                $userEditor = 'Feeditable';
+                $this->userEditor = 'Feeditable';
                 break;
             case 'SirTrevor':
-                $userEditor = 'SirTrevor';
+                $this->userEditor = 'SirTrevor';
                 break;
             case 'Jeditable':
             case 'SimpleMDE':
             default:
-                $userEditor = 'Jeditable';
+                $this->userEditor = 'SimpleMDE';
         }
 
         // set editor
-        switch ($userEditor) {
+        switch ($this->userEditor) {
             case 'Htmlforms':
             case 'Feeditable':
                 $this->editor = 'Feeditable';
@@ -735,7 +735,7 @@ class FeeditingPlugin
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
             foreach ($this->editorOptions as $editor) {
-                $options .= '<a href="/?editor=' . $editor . '">' . $editor . '</a>';
+                $options .= '<a href="/?editor=' . $editor . '" '.($this->userEditor == $editor ? 'style="font-weight:bold" class="selected"':'').'>' . $editor . '</a>';
             }
             $this->includeIntoAdminpanel(
                 '<div class="feeditingpanel"><a name="FeditableContent">Inline-Editor:</a>' . $options . '</div>'

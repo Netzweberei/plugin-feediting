@@ -29,8 +29,8 @@
 			    el.val(el.val().substring(0, max));
 			    if (settings.pulse && !p) {
 			    	pulse(container, true);
-			    };
-			};
+				}
+			}
 			if (settings.delay > 0) {
 				if (timeout) {
 					window.clearTimeout(timeout);
@@ -41,21 +41,19 @@
 			} else {
 				container.html(settings.format.replace(/%1/, (max - el.val().length)));
 			}
-		};
-		
+		}
 		function pulse(el, again) {
 			if (p) {
 				window.clearTimeout(p);
 				p = null;
-			};
+			}
 			el.animate({ opacity: 0.1 }, 100, function () {
 				$(this).animate({ opacity: 1.0 }, 100);
 			});
 			if (again) {
 				p = window.setTimeout(function () { pulse(el) }, 200);
-			};
-		};
-		
+			}
+		}
 		return this.each(function () {
 			var container = (!settings.container.match(/^<.+>$/)) 
 				? $(settings.container) 
@@ -75,7 +73,7 @@
 				});
 			if (this.addEventListener) {
 				this.addEventListener('input', function () { count(this, container); }, false);
-			};
+			}
 			count(this, container);
 		});
 	};

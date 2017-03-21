@@ -48,4 +48,4 @@ SirTrevor.Locales.cn = {
       'title': '标题'
     }
   }
-}
+};

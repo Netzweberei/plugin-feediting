@@ -1509,8 +1509,11 @@ jQuery.fn.extend({
 			var p = e.relatedTarget;
 	
 			// Traverse up the tree
-			while ( p && p != this ) try { p = p.parentNode } catch(e) { p = this; };
-			
+			while (p && p != this) try {
+				p = p.parentNode
+			} catch (e) {
+				p = this;
+			}
 			// If we actually just moused on to a sub-element, ignore it
 			if ( p == this ) return false;
 			

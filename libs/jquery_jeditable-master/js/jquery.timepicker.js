@@ -16,9 +16,9 @@
 			var v = $(this).val();
 	
 			// the options we need to generate
-			var hrs = new Array('01','02','03','04','05','06','07','08','09','10','11','12');
-			var mins = new Array('00','15','30','45');
-			var ap = new Array('am','pm');
+			var hrs = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+			var mins = ['00','15','30','45'];
+			var ap = ['am','pm'];
 			
 			// default to the current time
 			var d = new Date;

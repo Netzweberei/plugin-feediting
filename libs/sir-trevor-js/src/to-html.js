@@ -32,7 +32,7 @@ module.exports = function(markdown, type) {
   // with a slash.
   html = utils.reverse(
            utils.reverse(html)
-           .replace(/_(?!\\)((_\\|[^_])*)_(?=$|[^\\])/gm, function(match, p1) {
+           .replace(/_(?!\\|\/)((_\\|[^_])*)_(?!\/)(?=$|[^\\])/gm, function(match, p1) {
               return ">i/<"+ p1.replace(/\n/g, '').replace(/[\s]+$/,'') +">i<";
            })
            .replace(/\*\*(?!\\)((\*\*\\|[^\*\*])*)\*\*(?=$|[^\\])/gm, function(match, p1){

@@ -74,8 +74,7 @@
 						jQuery(dc('th')).attr({'scope':'col', 'abbr':day, 'title':day, 'class':(weekday == 0 || weekday == 6 ? 'weekend' : 'weekday')}).html(s.showHeader == $.dpConst.SHOW_HEADER_SHORT ? day.substr(0, 1) : day)
 					);
 				}
-			};
-			
+			}
 			var calendarTable = $(dc('table'))
 									.attr(
 										{
@@ -508,7 +507,7 @@
 		this.button				=	null;
 		this.renderCallback		=	[];
 		this.selectedDates		=	{};
-	};
+	}
 	$.extend(
 		DatePicker.prototype,
 		{	
@@ -956,15 +955,12 @@
 	{
 		if (ele._dpId) return $.event._dpCache[ele._dpId];
 		return false;
-	};
-	
+	}
 	// make it so that no error is thrown if bgIframe plugin isn't included (allows you to use conditional
 	// comments to only include bgIframe where it is needed in IE without breaking this plugin).
 	if ($.fn.bgIframe == undefined) {
 		$.fn.bgIframe = function() {return this; };
-	};
-
-
+	}
 	// clean-up
 	$(window)
 		.bind('unload', function() {

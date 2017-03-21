@@ -7,9 +7,10 @@
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.SimpleMDE = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 (function (global){
 
-; Typo = global.Typo = require("D:\\My Web Sites\\simplemde-markdown-editor\\node_modules\\codemirror-spell-checker\\src\\js\\typo.js");
-CodeMirror = global.CodeMirror = require("codemirror");
-; var __browserify_shim_require__=require;(function browserifyShim(module, define, require) {
+Typo = global.Typo = require("D:\\My Web Sites\\simplemde-markdown-editor\\node_modules\\codemirror-spell-checker\\src\\js\\typo.js");
+	CodeMirror = global.CodeMirror = require("codemirror");
+	var __browserify_shim_require__ = require;
+	(function browserifyShim(module, define, require) {
 // Initialize data globally to reduce memory consumption
 var num_loaded = 0;
 var aff_loading = false;
@@ -107,8 +108,9 @@ if(!String.prototype.includes) {
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{"D:\\My Web Sites\\simplemde-markdown-editor\\node_modules\\codemirror-spell-checker\\src\\js\\typo.js":2,"codemirror":6}],2:[function(require,module,exports){
 (function (global){
-; var __browserify_shim_require__=require;(function browserifyShim(module, exports, require, define, browserify_shim__define__module__export__) {
-'use strict';
+	var __browserify_shim_require__ = require;
+	(function browserifyShim(module, exports, require, define, browserify_shim__define__module__export__) {
+		'use strict';
 
 /**
  * Typo is a JavaScript implementation of a spellchecker using hunspell-style
@@ -874,9 +876,8 @@ Typo.prototype = {
 		return correct(word);
 	}
 };
-; browserify_shim__define__module__export__(typeof Typo != "undefined" ? Typo : window.Typo);
-
-}).call(global, undefined, undefined, undefined, undefined, function defineExport(ex) { module.exports = ex; });
+		browserify_shim__define__module__export__(typeof Typo != "undefined" ? Typo : window.Typo);
+	}).call(global, undefined, undefined, undefined, undefined, function defineExport(ex) { module.exports = ex; });
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
 },{}],3:[function(require,module,exports){
@@ -2283,9 +2284,8 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     // Used to work around IE issue with selection being forgotten when focus moves away from textarea
     this.hasSelection = false;
     this.composing = null;
-  };
-
-  function hiddenTextarea() {
+  }
+	function hiddenTextarea() {
     var te = elt("textarea", null, null, "position: absolute; padding: 0; width: 1px; height: 1em; outline: none");
     var div = elt("div", [te], null, "overflow: hidden; position: relative; width: 3px; height: 0px;");
     // The textarea is kept positioned near the cursor to prevent the
@@ -2366,7 +2366,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
       on(te, "compositionstart", function() {
         var start = cm.getCursor("from");
-        if (input.composing) input.composing.range.clear()
+        if (input.composing) input.composing.range.clear();
         input.composing = {
           start: start,
           range: cm.markText(start, cm.getCursor("to"), {className: "CodeMirror-composing"})
@@ -2639,7 +2639,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       var div = input.div = display.lineDiv;
       disableBrowserMagic(div);
 
-      on(div, "paste", function(e) { handlePaste(e, cm); })
+      on(div, "paste", function(e) { handlePaste(e, cm); });
 
       on(div, "compositionstart", function(e) {
         var data = e.data;
@@ -2903,7 +2903,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     },
     applyComposition: function(composing) {
       if (isReadOnly(this.cm))
-        operation(this.cm, regChange)(this.cm)
+        operation(this.cm, regChange)(this.cm);
       else if (composing.data && composing.data != composing.startData)
         operation(this.cm, applyTextInput)(this.cm, composing.data, 0, composing.sel);
     },
@@ -4482,8 +4482,8 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
         prevTouch = d.activeTouch;
         prevTouch.end = +new Date;
       }
-    };
-    function isMouseLikeTouchEvent(e) {
+	}
+	  function isMouseLikeTouchEvent(e) {
       if (e.touches.length != 1) return false;
       var touch = e.touches[0];
       return touch.radiusX <= 1 && touch.radiusY <= 1;
@@ -7348,8 +7348,8 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 
   function detachSharedMarkers(markers) {
     for (var i = 0; i < markers.length; i++) {
-      var marker = markers[i], linked = [marker.primary.doc];;
-      linkedDocs(marker.primary.doc, function(d) { linked.push(d); });
+		var marker = markers[i], linked = [marker.primary.doc];
+		linkedDocs(marker.primary.doc, function(d) { linked.push(d); });
       for (var j = 0; j < marker.markers.length; j++) {
         var subMarker = marker.markers[j];
         if (indexOf(linked, subMarker.doc) == -1) {
@@ -9206,10 +9206,10 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     }
   };
 
-  var noHandlers = []
+  var noHandlers = [];
   function getHandlers(emitter, type, copy) {
-    var arr = emitter._handlers && emitter._handlers[type]
-    if (copy) return arr && arr.length > 0 ? arr.slice() : noHandlers
+    var arr = emitter._handlers && emitter._handlers[type];
+    if (copy) return arr && arr.length > 0 ? arr.slice() : noHandlers;
     else return arr || noHandlers
   }
 
@@ -9219,14 +9219,14 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     else if (emitter.detachEvent)
       emitter.detachEvent("on" + type, f);
     else {
-      var handlers = getHandlers(emitter, type, false)
+      var handlers = getHandlers(emitter, type, false);
       for (var i = 0; i < handlers.length; ++i)
         if (handlers[i] == f) { handlers.splice(i, 1); break; }
     }
   };
 
   var signal = CodeMirror.signal = function(emitter, type /*, values...*/) {
-    var handlers = getHandlers(emitter, type, true)
+    var handlers = getHandlers(emitter, type, true);
     if (!handlers.length) return;
     var args = Array.prototype.slice.call(arguments, 2);
     for (var i = 0; i < handlers.length; ++i) handlers[i].apply(null, args);
@@ -9242,7 +9242,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
   // them to be executed when the last operation ends, or, if no
   // operation is active, when a timeout fires.
   function signalLater(emitter, type /*, values...*/) {
-    var arr = getHandlers(emitter, type, false)
+    var arr = getHandlers(emitter, type, false);
     if (!arr.length) return;
     var args = Array.prototype.slice.call(arguments, 2), list;
     if (operationGroup) {
@@ -9253,8 +9253,12 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       list = orphanDelayedCallbacks = [];
       setTimeout(fireOrphanDelayed, 0);
     }
-    function bnd(f) {return function(){f.apply(null, args);};};
-    for (var i = 0; i < arr.length; ++i)
+	  function bnd(f) {
+		  return function () {
+			  f.apply(null, args);
+		  };
+	  }
+	  for (var i = 0; i < arr.length; ++i)
       list.push(bnd(arr[i]));
   }
 
@@ -9342,7 +9346,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
       pos = nextTab + 1;
       if (col >= goal) return pos;
     }
-  }
+  };
 
   var spaceStrs = [""];
   function spaceStr(n) {
@@ -9382,9 +9386,8 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
     }
     if (props) copyObj(props, inst);
     return inst;
-  };
-
-  function copyObj(obj, target, overwrite) {
+  }
+	function copyObj(obj, target, overwrite) {
     if (!target) target = {};
     for (var prop in obj)
       if (obj.hasOwnProperty(prop) && (overwrite !== false || !target.hasOwnProperty(prop)))
@@ -9956,7 +9959,7 @@ CodeMirror.overlayMode = function(base, overlay, combine) {
 })(function(CodeMirror) {
 "use strict";
 
-var urlRE = /^((?:(?:aaas?|about|acap|adiumxtra|af[ps]|aim|apt|attachment|aw|beshare|bitcoin|bolo|callto|cap|chrome(?:-extension)?|cid|coap|com-eventbrite-attendee|content|crid|cvs|data|dav|dict|dlna-(?:playcontainer|playsingle)|dns|doi|dtn|dvb|ed2k|facetime|feed|file|finger|fish|ftp|geo|gg|git|gizmoproject|go|gopher|gtalk|h323|hcp|https?|iax|icap|icon|im|imap|info|ipn|ipp|irc[6s]?|iris(?:\.beep|\.lwz|\.xpc|\.xpcs)?|itms|jar|javascript|jms|keyparc|lastfm|ldaps?|magnet|mailto|maps|market|message|mid|mms|ms-help|msnim|msrps?|mtqp|mumble|mupdate|mvn|news|nfs|nih?|nntp|notes|oid|opaquelocktoken|palm|paparazzi|platform|pop|pres|proxy|psyc|query|res(?:ource)?|rmi|rsync|rtmp|rtsp|secondlife|service|session|sftp|sgn|shttp|sieve|sips?|skype|sm[bs]|snmp|soap\.beeps?|soldat|spotify|ssh|steam|svn|tag|teamspeak|tel(?:net)?|tftp|things|thismessage|tip|tn3270|tv|udp|unreal|urn|ut2004|vemmi|ventrilo|view-source|webcal|wss?|wtai|wyciwyg|xcon(?:-userid)?|xfire|xmlrpc\.beeps?|xmpp|xri|ymsgr|z39\.50[rs]?):(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]|\([^\s()<>]*\))+(?:\([^\s()<>]*\)|[^\s`*!()\[\]{};:'".,<>?«»“”‘’]))/i
+var urlRE = /^((?:(?:aaas?|about|acap|adiumxtra|af[ps]|aim|apt|attachment|aw|beshare|bitcoin|bolo|callto|cap|chrome(?:-extension)?|cid|coap|com-eventbrite-attendee|content|crid|cvs|data|dav|dict|dlna-(?:playcontainer|playsingle)|dns|doi|dtn|dvb|ed2k|facetime|feed|file|finger|fish|ftp|geo|gg|git|gizmoproject|go|gopher|gtalk|h323|hcp|https?|iax|icap|icon|im|imap|info|ipn|ipp|irc[6s]?|iris(?:\.beep|\.lwz|\.xpc|\.xpcs)?|itms|jar|javascript|jms|keyparc|lastfm|ldaps?|magnet|mailto|maps|market|message|mid|mms|ms-help|msnim|msrps?|mtqp|mumble|mupdate|mvn|news|nfs|nih?|nntp|notes|oid|opaquelocktoken|palm|paparazzi|platform|pop|pres|proxy|psyc|query|res(?:ource)?|rmi|rsync|rtmp|rtsp|secondlife|service|session|sftp|sgn|shttp|sieve|sips?|skype|sm[bs]|snmp|soap\.beeps?|soldat|spotify|ssh|steam|svn|tag|teamspeak|tel(?:net)?|tftp|things|thismessage|tip|tn3270|tv|udp|unreal|urn|ut2004|vemmi|ventrilo|view-source|webcal|wss?|wtai|wyciwyg|xcon(?:-userid)?|xfire|xmlrpc\.beeps?|xmpp|xri|ymsgr|z39\.50[rs]?):(?:\/{1,3}|[a-z0-9%])|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}\/)(?:[^\s()<>]|\([^\s()<>]*\))+(?:\([^\s()<>]*\)|[^\s`*!()\[\]{};:'".,<>?«»“”‘’]))/i;
 
 CodeMirror.defineMode("gfm", function(config, modeConfig) {
   var codeDepth = 0;
@@ -10206,8 +10209,8 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
     state.trailingSpace = 0;
     state.trailingSpaceNewLine = false;
     // Mark this line as blank
-    state.prevLine = state.thisLine
-    state.thisLine = null
+    state.prevLine = state.thisLine;
+    state.thisLine = null;
     return null;
   }
 
@@ -10286,7 +10289,7 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
       if (modeCfg.highlightFormatting) state.formatting = ["list", "list-" + listType];
       return getType(state);
     } else if (modeCfg.fencedCodeBlocks && (match = stream.match(fencedCodeRE, true))) {
-      state.fencedChars = match[1]
+      state.fencedChars = match[1];
       // try switching mode
       state.localMode = getMode(match[2]);
       if (state.localMode) state.localState = state.localMode.startState();
@@ -10834,12 +10837,12 @@ CodeMirror.defineMode("markdown", function(cmCfg, modeCfg) {
 
         if (stream.match(/^\s*$/, true) || forceBlankLine) {
           blankLine(state);
-          if (!forceBlankLine) return null
+          if (!forceBlankLine) return null;
           state.prevLine = null
         }
 
-        state.prevLine = state.thisLine
-        state.thisLine = stream
+        state.prevLine = state.thisLine;
+        state.thisLine = stream;
 
         // Reset state.taskList
         state.taskList = false;
@@ -11467,15 +11470,9 @@ if (!CodeMirror.mimeModes.hasOwnProperty("text/html"))
 
 },{"../../lib/codemirror":6}],11:[function(require,module,exports){
 (function (global){
-/**
- * marked - a markdown parser
- * Copyright (c) 2011-2014, Christopher Jeffrey. (MIT Licensed)
- * https://github.com/chjj/marked
- */
 
-;(function() {
-
-/**
+(function () {
+		/**
  * Block-Level Grammar
  */
 
@@ -12080,7 +12077,7 @@ InlineLexer.prototype.output = function(src) {
         ? this.options.sanitizer
           ? this.options.sanitizer(cap[0])
           : escape(cap[0])
-        : cap[0]
+        : cap[0];
       continue;
     }
 

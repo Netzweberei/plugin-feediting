@@ -379,6 +379,11 @@
                     
                     /* Show tooltip again. */
                     $(self).attr('title', settings.tooltip);
+
+                    /* Recalculate iframe-height */
+                    if(window.frameElement && window.frameElement.id && window.parent) {
+                        window.parent.iframeLoaded(window.frameElement.id);
+                    }
                     
                     return false;
                 });
@@ -398,6 +403,11 @@
                         /* Show tooltip again. */
                         if (settings.tooltip) {
                             $(self).attr('title', settings.tooltip);                
+                        }
+
+                        /* Recalculate iframe-height */
+                        if(window.frameElement && window.frameElement.id && window.parent) {
+                            window.parent.iframeLoaded(window.frameElement.id);
                         }
                     }                    
                 }

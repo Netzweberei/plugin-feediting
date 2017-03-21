@@ -16,6 +16,20 @@
  *
  */
 var registermdes = [];
+
+function iframeLoaded(iframeID) {
+    var iframe = document.getElementById(iframeID);
+    if(iframe) {
+        iframe.height = "";
+        $(iframe).css('height', iframe.height);
+
+        iframe.height = iframe.contentWindow.document.body.scrollHeight + "px";
+        $(iframe).css('height', iframe.height);
+
+        console.log('set height to ' + iframe.height);
+    }
+}
+
 $.editable.addInputType('simplemde', {
     element : function(settings, original) {
 
@@ -36,24 +50,59 @@ $.editable.addInputType('simplemde', {
     },
     plugin : function(settings, original) {
 
+        /* make sure, only one editor visible at a time */
         for(i in registermdes){
+            //console.log(i);
             if(i != $(original).attr('id')){
-//                console.log(i);
-//                console.log(registermdes[i].element.parentNode.parentNode);
-//                console.log($(registermdes[i].element.parentNode.parentNode).find('form button[type=cancel]'));
+                //console.log(registermdes[i].element.parentNode.parentNode);
+                //console.log($(registermdes[i].element.parentNode.parentNode).find('form button[type=cancel]'));
                 $(registermdes[i].element.parentNode.parentNode).find('form button[type=cancel]').click();
             }
         }
 
         var simplemde = new SimpleMDE({
+            autofocus: true,
             element: $(this).find('#'+$(original).attr('id')+' textarea')[0]
         });
 
-        registermdes[$(original).attr('id')] = simplemde;
+        //simplemde.codemirror.on("blur", function(){
+        //    console.log('blur...');
+        //});
 
-//        simplemde.codemirror.on("blur", function(){
-//            $(original).find('form button[type=cancel]').click();
-//        });
+        inlineAttachment.editors.codemirror4.attach(simplemde.codemirror, {
+            onFileUploadResponse: function(xhr) {
+                var result = JSON.parse(xhr.responseText),
+                    filename = result[this.settings.jsonFieldName];
+
+                if (result && filename) {
+                    var newValue;
+                    if (typeof this.settings.urlText === 'function') {
+                        newValue = this.settings.urlText.call(this, filename, result);
+                    } else {
+                        newValue = this.settings.urlText.replace(this.filenameTag, filename);
+                    }
+                    var text = this.editor.getValue().replace(this.lastValue, newValue);
+                    this.editor.setValue(text);
+                    this.settings.onFileUploaded.call(this, filename);
+                }
+                return false;
+            }
+        });
+
+        /* Recalculate iframe-height */
+        if(window.frameElement && window.frameElement.id && window.parent) {
+            window.parent.iframeLoaded(window.frameElement.id);
+        }
+
+        $(original).find('form button[type=cancel]').bind('click', function(){
+            //console.log('jeditable clicked!');
+            /* Recalculate iframe-height */
+            if(window.frameElement && window.frameElement.id && window.parent) {
+                window.parent.iframeLoaded(window.frameElement.id);
+            }
+        });
+
+        registermdes[$(original).attr('id')] = simplemde;
     }
 });
 

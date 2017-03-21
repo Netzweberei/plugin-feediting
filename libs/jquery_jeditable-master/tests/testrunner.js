@@ -277,7 +277,7 @@ function flatMap(a, block) {
 		var x = block.apply(this, arguments);
 		if (x !== false)
 			result.push(x);
-	})
+	});
 	return result;
 }
 

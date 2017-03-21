@@ -108,7 +108,7 @@ $.editable.addInputType('datepicker', {
     plugin : function(settings, original) {
         /* Workaround for missing parentNode in IE */
         var form = this;
-        settings.onblur = 'cancel'
+        settings.onblur = 'cancel';
         $("input", this)
         .datePicker({createButton:false})
         .bind('click', function() {
@@ -156,7 +156,7 @@ $.editable.addInputType('ajaxupload', {
                 error: function (data, status, e) {
                     alert(e);
                 }
-            })
+            });
             return(false);
         });
     }
@@ -164,7 +164,7 @@ $.editable.addInputType('ajaxupload', {
 
 $.editable.addInputType('john', {
     element : function(settings, original) {
-        var default_textarea = $.editable.types['textarea'].element
+        var default_textarea = $.editable.types['textarea'].element;
         var input = default_textarea.apply(this, [settings, original]);
         return(input);
     },
@@ -183,7 +183,7 @@ $.editable.addInputType('john', {
 $.editable.addInputType('threebutton', {
     buttons : function(settings, original) {
         /* Call default function to create submit and cancel buttons. */
-        var default_buttons = $.editable.types['defaults'].buttons
+        var default_buttons = $.editable.types['defaults'].buttons;
         default_buttons.apply(this, [settings, original]);
         /* Add third button. */
         var third = $('<input type="button">');

@@ -101,8 +101,7 @@ Date.format = 'dd/mm/yyyy';
 		if( !Date.prototype[name] ) {
 			Date.prototype[name] = method;
 		}
-	};
-	
+	}
 	/**
 	 * Checks if the year is a leap year.
 	 *
@@ -442,12 +441,12 @@ Date.format = 'dd/mm/yyyy';
 		d.setDate(Number(s.substr(f.indexOf('dd'), 2)));
 		if (isNaN(d.getTime())) return false;
 		return d;
-	}
+	};
 	
 	// utility method
 	var _zeroPad = function(num) {
 		var s = '0'+num;
-		return s.substring(s.length-2)
+		return s.substring(s.length-2);
 		//return ('0'+num).substring(-2); // doesn't work on IE :(
 	};
 	

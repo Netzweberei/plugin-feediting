@@ -84,37 +84,37 @@ class FeeditableContent
                 "exclude-10" => [
                     "mdregex" => '/^$/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-20" => [
                     "mdregex" => '/^-- row .*/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-20" => [
                     "mdregex" => '/^-- grid .*/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-30" => [
                     "mdregex" => '/^----$/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-35" => [
                     "mdregex" => '/^--$/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-40" => [
                     "mdregex" => '/^-- end --$/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
                 "exclude-45" => [
                     "mdregex" => '/^-- grid --$/',
                     "template" => '',
-                    "insert" => 'inline'
+                    "insert" => 'ownline'
                 ],
             ],
             $this->contentBlocks
@@ -241,142 +241,203 @@ class FeeditableContent
      */
     protected function identifyMarkdownBlocks($content, $offset = 0, $segmentId = false)
     {
-        $segmentId = $segmentId ? $segmentId : $this->segmentid;
-        $eol = PHP_EOL;
-        $class = $this->pluginConfig['editable_prefix'] . $this->format . '-' . $segmentId;
-        $openBlock = true;
-        $blockId = false;
+        $segmentId  = $segmentId ? $segmentId : $this->segmentid;
+        $class      = $this->pluginConfig['editable_prefix'] . $this->format . '-' . $segmentId;
+        $eol        = PHP_EOL;
+        $blockId    = false;
+        $openBlock  = true;
+        $b_type     = null;
 
         // prepare for indexing
         $content = $this->stripEmptyContentblocks($content);
         $this->plugin->defineLineFeed($this->getFormat(), '<!--eol-->');
 
         $lines = explode($eol, $content);
-        foreach ($lines as $ctr => $line) {
+        //foreach ($lines as $ctr => $line)
+        while (list($ctr, $line) = each($lines))
+        {
             $lineno = $this->calcLineIndex($ctr, $offset, $segmentId);
 
             // switch between save- and edit-view
             $withCmdSave = strpos($this->plugin->cmd, 'save') !== false ? true : false;
 
-            // get rid of MS's-CRs
-            $line = strtr(
-                $line,
-                [
+            // sanitize the found contents:
+            $line = strtr( $line, [
+                    // eg. get rid of MS's-CRs
                     "\r" => ''
-                ]
-            );
+            ]);
 
-            // group special elements in their own block
-            foreach ($this->contentBlocks as $b_type => $b_def) {
-                // looking for special content which need its own block
-                if ($b_type != 'textBlock' && preg_match($b_def['mdregex'], $line, $test)) {
-                    // if a "normal" block of multiple lines is still open, we close it
-                    if ($blockId !== false) {
-                        $this->blocks[$blockId + 1] = ($segmentId === false) ? '' : $this->insertEditableTag(
-                            $blockId,
-                            $class,
-                            'stop',
-                            $b_type,
-                            MARKDOWN_EOL
-                        );
-                        $blockId = false;
-                        $openBlock = true;
-                    }
+            if($line == '') continue;
 
-                    // if edit-view requires masking distinct chars
-                    if (isset($b_def['editingMaskMap']) && $withCmdSave === false) {
-                        $line = strtr($line, $b_def['editingMaskMap']);
-                    }
+            // opening a new block requires closing the previous one
+            if ($blockId !== false)
+            {
+                $this->blocks[$blockId + 1] = ($segmentId === false)
+                    ? ''
+                    : $this->insertEditableTag(
+                        $blockId,
+                        $class,
+                        'stop',
+                        $b_type,
+                        MARKDOWN_EOL
+                    );
+                $blockId = false;
+                $openBlock = true;
+            }
 
-                    if ($b_def['template'] !== '') {
-                        // build special block
-                        preg_match($b_def['dataregex'], $line, $b_data);
-                        if (count($b_data) > 1) {
-                            array_shift($b_data);
-                        }
-                        switch ($b_def['insert']) {
-                            case 'inline':
-                                $this->blocks[$lineno] = $this->insertEditableTag(
-                                    $lineno,
-                                    $class,
-                                    'auto',
-                                    $b_type,
-                                    MARKDOWN_EOL,
-                                    $b_data
-                                );
-                                break;
+            // current line matches a block-definition?
+            foreach ($this->contentBlocks as $b_type => $b_def)
+            {
+                if(stripos($b_type, 'exclude-')!==false) continue;
 
-                            case 'inlineButWriteRegex0':
-                                $this->blocks[$lineno] = $this->insertEditableTag(
-                                    $lineno,
-                                    $class,
-                                    'auto',
-                                    $b_type,
-                                    MARKDOWN_EOL,
-                                    $withCmdSave !== false ? reset($b_data) : array_slice($b_data, 1)
-                                );
-                                break;
+                switch($b_type)
+                {
+                    case 'textBlock':
+                    case 'midpageBlock':
 
-                            case 'array':
-                                $this->blocks[$lineno - 1] = $this->insertEditableTag(
-                                    $lineno,
+                        if ($openBlock && preg_match($b_def['mdregex'], $line, $test))
+                        {
+                            $blockId = $lineno;
+
+                            $this->blocks[$blockId - 1] = ($segmentId === false)
+                                ? ''
+                                : $this->insertEditableTag(
+                                    $blockId,
                                     $class,
                                     'start',
-                                    $b_type,
+                                    'textBlock',
                                     MARKDOWN_EOL
                                 );
-                                $this->blocks[$lineno] = reset($b_data);
-                                $this->blocks[$lineno + 1] = $this->insertEditableTag(
-                                    $lineno,
-                                    $class,
-                                    'stop',
-                                    $b_type,
-                                    MARKDOWN_EOL
-                                );
-                                break;
+                            do
+                            {
+                                // editing pure text still requires to us mask some chars?
+                                if ($withCmdSave === false && isset($b_def['editingMaskMap']))
+                                {
+                                    $line = strtr($line, $b_def['editingMaskMap']);
+                                }
+
+                                if(!isset($this->blocks[$blockId]))
+                                    $this->blocks[$blockId] = $line;
+                                else
+                                    $this->blocks[$blockId] .= $line;
+
+                                $this->blocks[$blockId] .= ($b_def['insert'] == 'multiline')
+                                    ? $this->getLineFeedMarker($this->getFormat())
+                                    : $eol;
+
+                                list($ctr, $line) = each($lines);
+                            }
+                            while (
+                                preg_match(@$b_def['mdregexStop'], $line, $test) == 0
+                                && $ctr
+                            );
                         }
-                    } else {
-                        // don't build an editable block
-                        $this->blocks[$lineno] = ($ctr == count($lines) - 1) ? $line : $line . $eol;
-                    }
-                    // continue reading
-                    continue 2;
+
+                        break;
+
+                    default:
+
+                        // looking for special content which need its own block
+                        if (
+                            preg_match($b_def['mdregex'], $line, $test)
+                        ) {
+                            // in case editing requires some masking...
+                            if ($withCmdSave === false && isset($b_def['editingMaskMap']))
+                            {
+                                $line = strtr($line, $b_def['editingMaskMap']);
+                            }
+
+                            if ($b_def['template'] !== '')
+                            {
+                                // search for the block's data
+                                preg_match($b_def['dataregex'], $line, $b_data);
+                                if (count($b_data) > 1) array_shift($b_data);
+
+                                switch ($b_def['insert'])
+                                {
+                                    case 'inline':
+                                        $this->blocks[$lineno] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'auto',
+                                            $b_type,
+                                            '',
+                                            $b_data
+                                        );
+                                        break;
+
+                                    case 'ownline':
+                                        $this->blocks[$lineno] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'auto',
+                                            $b_type,
+                                            MARKDOWN_EOL,
+                                            $b_data
+                                        );
+                                        break;
+
+                                    case 'inlineButWriteRegex0':
+                                        $this->blocks[$lineno] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'auto',
+                                            $b_type,
+                                            '',
+                                            $withCmdSave !== false ? reset($b_data) : array_slice($b_data, 1)
+                                        );
+                                        break;
+
+                                    case 'ownlineButWriteRegex0':
+                                        $this->blocks[$lineno] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'auto',
+                                            $b_type,
+                                            MARKDOWN_EOL,
+                                            $withCmdSave !== false ? reset($b_data) : array_slice($b_data, 1)
+                                        );
+                                        break;
+
+                                    case 'array':
+                                        $this->blocks[$lineno - 1] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'start',
+                                            $b_type,
+                                            MARKDOWN_EOL
+                                        );
+                                        $this->blocks[$lineno] = reset($b_data);
+                                        $this->blocks[$lineno + 1] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'stop',
+                                            $b_type,
+                                            MARKDOWN_EOL
+                                        );
+                                        break;
+                                }
+                            }
+
+                            // build next block
+                            continue 3;
+                        }
                 }
-            }
-            // edit-view requires to us mask some chars?
-            if (isset($b_def['editingMaskMap']) && $withCmdSave === false) {
-                $line = strtr($line, $b_def['editingMaskMap']);
-            }
-            if ($openBlock) {
-                $blockId = $lineno;
-                $this->blocks[$blockId - 1] = ($segmentId === false) ? '' : $this->insertEditableTag(
-                    $blockId,
-                    $class,
-                    'start',
-                    'textBlock',
-                    MARKDOWN_EOL
-                );
-                // respect linebreaks
-                $this->blocks[$blockId] = $line . ($b_def['insert'] == 'multiline' ? $this->getLineFeedMarker(
-                        $this->getFormat()
-                    ) : $eol);
-                $openBlock = false;
-            } else {
-                $this->blocks[$blockId] .= $line . ($b_def['insert'] == 'multiline' ? $this->getLineFeedMarker(
-                        $this->getFormat()
-                    ) : $eol);
             }
         }
 
         // if the last block of multiple lines is still open, we close it
-        if ($blockId) {
-            $this->blocks[$blockId + 1] = ($segmentId === false) ? '' : $this->insertEditableTag(
-                $blockId,
-                $class,
-                'stop',
-                $b_type,
-                MARKDOWN_EOL
-            );
+        if ($blockId)
+        {
+            $this->blocks[$blockId + 1] = ($segmentId === false)
+                ? ''
+                : $this->insertEditableTag(
+                    $blockId,
+                    $class,
+                    'stop',
+                    $b_type,
+                    MARKDOWN_EOL
+                );
         }
 
         end($this->blocks);

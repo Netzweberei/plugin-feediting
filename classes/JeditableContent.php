@@ -25,9 +25,16 @@ class JeditableContent extends FeeditableContent
             "dataregex" => '/.*/',
             "insert" => 'array'
         ],
+        "iframeBlock" => [
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s?editor=iframe" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "mdregex" => '/\/_.*/',
+            "dataregex" => '/(\/(_.*)\.md)/',
+            "insert" => 'inlineButWriteRegex0'
+        ],
         "textBlock" => [
             "template" => '<div class="###class###" id="###id###">%s</div>',
             "mdregex" => '/.*/',
+            "mdregexStop" => '/^$/',
             "dataregex" => '/.*/',
             "insert" => 'multiline'
         ]
@@ -100,14 +107,16 @@ class JeditableContent extends FeeditableContent
         ajaxoptions : {
             replace : "with",
             container : "' . $segmentSelector . '",
-            run: "withContainer' . ucfirst($containerId) . '();"
+            run: "withContainer' . ucfirst($containerId) .'();"
         }
     });
-};
+}
 
 $(document).ready(function(){
-    withContainer' . ucfirst($containerId) . '();
+    withContainer'. ucfirst($containerId) . '();
 });
+
+
 </script>';
 
         return $ret;
@@ -123,7 +132,10 @@ $(document).ready(function(){
         // also provide the 'spinner'
         $this->plugin->provideAsset($path . 'libs/jquery_jeditable-master/img/indicator.gif');
         // Due to my basic programming skills, the files have to be included in reverse order!
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_responsiveiframe/jquery.responsiveiframe.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/simplemde/dist/codemirror.inline-attachment.js');
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/simplemde/dist/inline-attachment.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/simplemde/dist/simplemde.min.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_jeditable-master/jquery.jeditable.js');
         if (false === $this->pluginConfig['dontProvideJquery']) {

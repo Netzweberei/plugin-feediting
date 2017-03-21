@@ -31,51 +31,64 @@ class SirTrevorContent extends FeeditableContent
             "mdregex" => '/^#/',
             "dataregex" => '/(.*)/',
             "editingMaskMap" => ['"' => '\"'],
-            "insert" => 'inline'
+            "insert" => 'ownline'
         ],
         "widgetBlock" => [
             "template" => '{"type":"widget","data":{"selected":"%s", "slide":"%2$d"}},',
             "mdregex" => '/^\{\{\s?widget/',
             "dataregex" => '/(^.*\([\'\"]{1}(.*)[\'\"]{1}\,?\s?([0-9]*)\).*$)/',
-            "insert" => 'inlineButWriteRegex0'
+            "insert" => 'ownlineButWriteRegex0'
         ],
         "imageBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\!\[/',
             "dataregex" => '/(^.*\((.*)\).*$)/',
             "editingMaskMap" => ['/site' => '@site'],
-            "insert" => 'inlineButWriteRegex0'
+            "insert" => 'ownlineButWriteRegex0'
         ],
         "smartyimageBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"%s"}}},',
             "mdregex" => '/^\[image\s/',
             "dataregex" => '/(^\[image\s([^\s]+)\s.*$)/',
-            "insert" => 'inlineButWriteRegex0'
+            "insert" => 'ownlineButWriteRegex0'
         ],
         "hrBlock" => [
             "template" => '{"type":"text","data":{"text":"%s--------------------"}},',
             "mdregex" => '/^---*|___*$/',
             "dataregex" => '//',
-            "insert" => 'inline'
+            "insert" => 'ownline'
         ],
         "videoBlock" => [
             "template" => '{"type":"video","data":{"source":"youtube","remote_id":"%1$s"}},',
             "mdregex" => '/^\{\{ youtube/',
             "dataregex" => '/(^{\{ youtube\("(.*)".*$)/',
-            "insert" => 'inlineButWriteRegex0',
+            "insert" => 'ownlineButWriteRegex0',
             "tmplstrSeparator" => '%1$s'
         ],
         "imagineBlock" => [
             "template" => '{"type":"image","data":{"file":{"url":"media/%s"}}},',
             "mdregex" => '/^\<img/',
             "dataregex" => '/\'([a-zA-Z\.0-9\-\_]*)\'/',
-            "insert" => 'inline'
+            "insert" => 'ownline'
         ],
-        "textBlock" => [
+        "midpageBlock" => [
+            "type" => 'textBlock',
             "template" => '{"type":"text","data":{"text":"%s"}},',
-            "mdregex" => '/.*/',
+            "mdregex" => '/^\[block\]/',
+            "mdregexStop" => '/^\[\/block\]/',
             "dataregex" => '/.*/',
             "editingMaskMap" => ['"' => '\"'],
+            "insert" => 'multiline'
+        ],
+        "textBlock" => [
+            "type" => 'textBlock',
+            "template" => '{"type":"text","data":{"text":"%s"}},',
+            "mdregex" => '/.*/',
+            "mdregexStop" => '/^$/',
+            "dataregex" => '/.*/',
+            "editingMaskMap" => [
+                '"' => '\"'
+            ],
             "insert" => 'multiline'
         ],
     ];
@@ -134,7 +147,9 @@ class SirTrevorContent extends FeeditableContent
                 '</script>'
             );
         }
-        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_fancybox/jquery.fancybox.js');
+        $this->plugin->includeBeforeBodyEnds($path . 'libs/ios-html5-drag-drop-shim-master/ios-drag-drop.js');
+        $this->plugin->includeAfterBodyStarts('<script type="text/javascript" charset="utf-8">var iosDragDropShim = { enableEnterLeave: true }</script>');
+//        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_fancybox/jquery.fancybox.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/sir-trevor-js/locales/de.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/sir-trevor-js/sir-trevor.js');
         $this->plugin->includeBeforeBodyEnds($path . 'libs/Eventable/eventable.js');

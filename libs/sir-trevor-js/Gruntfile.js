@@ -45,7 +45,7 @@ module.exports = function(grunt) {
     browser: true,
     jquery: true,
     node: true,
-  }
+  };
 
   grunt.loadNpmTasks('grunt-browserify');
   grunt.loadNpmTasks('grunt-karma');

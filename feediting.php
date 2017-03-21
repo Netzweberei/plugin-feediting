@@ -42,7 +42,7 @@ class FeeditingPlugin
 
     private $editor = 'Feeditable';
 
-    private $editorOptions = ['SirTrevor', 'SimpleMDE'];
+    private $editorOptions = ['Build', 'Preview'];
 
     private $cmd;
 
@@ -55,6 +55,8 @@ class FeeditingPlugin
     private $subsegmentid_format = '%s[%s]';
 
     private $subsegment_placeholder = '+++subsegment-%s+++';
+
+    private $isRealPage = true;
 
     public function __construct()
     {
@@ -106,11 +108,14 @@ class FeeditingPlugin
             case 'Htmlforms':
                 $this->userEditor = 'Feeditable';
                 break;
+            case 'Build':
             case 'SirTrevor':
+            case 'Inline-access':
                 $this->userEditor = 'SirTrevor';
                 break;
             case 'Jeditable':
             case 'SimpleMDE':
+            case 'Preview':
             default:
                 $this->userEditor = 'SimpleMDE';
         }
@@ -259,6 +264,8 @@ class FeeditingPlugin
 
     protected function onPageLoaded(\Herbie\Page $page)
     {
+        if(!$this->isRealPage($page)) return;
+
         $this->recursivePageLoads++;
         if (
             $this->isEditable($page)
@@ -269,6 +276,9 @@ class FeeditingPlugin
             DI::get('Twig')->getEnvironment()->setCache(false);
 
             $this->page = $page;
+
+            if(@$_GET['editor'] == 'iframe') $this->page->layout = 'iframeeditor.html';
+
             $this->cmd  = @$_REQUEST['cmd'];
 
             $segmentId = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : '0';
@@ -285,6 +295,13 @@ class FeeditingPlugin
             }
             $this->editPage($_twigify);
         }
+    }
+
+    private function isRealPage($page = null){
+        if($page && stripos($page->getPath(), '@plugin')!==false){
+            $this->isRealPage = false;
+        }
+        return $this->isRealPage;
     }
 
     private function isEditable(\Herbie\Page $page)
@@ -728,6 +745,7 @@ class FeeditingPlugin
 
     protected function onOutputGenerated($response)
     {
+        if(!$this->isRealPage()) return;
 
         $this->response = $response;
         $this->self = $this->config->get('plugins.path') . '/feediting/';
@@ -735,10 +753,10 @@ class FeeditingPlugin
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
             foreach ($this->editorOptions as $editor) {
-                $options .= '<a href="/?editor=' . $editor . '" '.($this->userEditor == $editor ? 'style="font-weight:bold" class="selected"':'').'>' . $editor . '</a>';
+                $options .= '<a href="/?editor=' . $editor . '" '.(@$_SESSION['NWeditor'] == $editor ? 'style="font-weight:bold" class="selected"':'').'>' . $editor . '</a>';
             }
             $this->includeIntoAdminpanel(
-                '<div class="feeditingpanel"><a name="FeditableContent">Inline-Editor:</a>' . $options . '</div>'
+                '<div class="feeditingpanel"><a name="FeditableContent">Inline-access:</a>' . $options . '</div>'
             );
         }
         $this->includeIntoHeader($this->self . 'assets/css/feediting.css');
@@ -758,7 +776,6 @@ class FeeditingPlugin
             }
             $content = strtr($content, $late_replace_pairs);
         }
-
         $response->setContent($content);
     }
 
@@ -776,7 +793,7 @@ class FeeditingPlugin
     private function getEditablesCssConfig($pluginPath)
     {
         $validKeys = array_keys($this->editableContent);
-        $this->editableContent[$validKeys[0]]->getEditablesCssConfig($pluginPath);
+        $this->editableContent[@$validKeys[0]]->getEditablesCssConfig($pluginPath);
     }
 
     private function getEditablesJsConfig($pluginPath)
@@ -784,69 +801,6 @@ class FeeditingPlugin
         $validKeys = array_keys($this->editableContent);
         $this->editableContent[$validKeys[0]]->getEditablesJsConfig($pluginPath);
     }
-
-//    protected function onWidgetLoaded(\Herbie\Event $event)
-//    {
-//        switch ($this->cmd) {
-//            case 'saveWidget':
-//
-//                // Load widget's specific layout
-//                $widgetTemplateDir = $event->offsetGet('widgetTemplateDir');
-//                $pageLoader = $event->offsetGet('pageLoader');
-//                $pageLoader->addPath($widgetTemplateDir);
-//
-//                $this->cmd = 'saveAndReturn';
-//                $this->editableContent = [];
-//                $this->editWidget($event);
-//                // Reload changed content
-//                $this->page->load($this->path);
-//
-//            case 'getWidgetByName':
-//
-//                // Load widget's specific layout
-//                $widgetTemplateDir = $event->offsetGet('widgetTemplateDir');
-//                $pageLoader = $event->offsetGet('pageLoader');
-//                $pageLoader->addPath($widgetTemplateDir);
-//
-//                $this->cmd = 'editWidget';
-//                $this->editWidget($event);
-//        }
-//    }
-
-//    protected function editWidget(\Herbie\Event $event)
-//    {
-//
-//        // Disable Caching while editing
-//        //$this->app['twig']->environment->setCache(false);
-//
-//        $this->page = $this->app['page'];
-//        $this->alias = $this->app['alias'];
-//        $this->path = $this->alias->get($event->offsetGet('widgetPath'));
-//
-//        $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
-//
-//        $this->editPage($_twigify);
-//    }
-
-//    protected function onWidgetGenerated(\Herbie\Event $event)
-//    {
-//
-//        switch ($this->cmd) {
-//            case 'editWidget':
-//
-//                $widgetData = $event->offsetGet('widgetData');
-//                $this->cmd = 'renderWidget';
-//
-//                // Widget's main template 'index.html' is included into feediting.html
-//                $this->app['menuItem']->setData(['layout' => 'feediting.html']);
-//                $this->app['page']->setData($widgetData['data']);
-//                $this->app['page']->setSegments($widgetData['segments']);
-//
-//
-//            default:
-//                return;
-//        }
-//    }
 
     private function getReplacement($mark)
     {

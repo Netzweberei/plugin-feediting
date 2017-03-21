@@ -15,7 +15,7 @@
  * Revision: $Id$
  *
  */
-var timepickerFormId = 0
+var timepickerFormId = 0;
 $.editable.addInputType('timepicker', {
     /* This uses default hidden input field. No need for element() function. */
 

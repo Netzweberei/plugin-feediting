@@ -25,16 +25,24 @@ class JeditableContent extends FeeditableContent
             "dataregex" => '/.*/',
             "insert" => 'array'
         ],
-        "iframeBlock" => [
-            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s?editor=iframe" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
-            "mdregex" => '/\/_.*/',
+        "iaWriterBlock" => [
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "mdregex" => '/(?<=^)\\/_.*/s',
             "dataregex" => '/(\/(_.*)\.md)/',
+            "insert" => 'inlineButWriteRegex0'
+        ],
+
+        // @todo: define a filename and use the default path instead!
+        "blocksBlock" => [
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/_index/test?path=%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "mdregex" => '/(?<=^)\\[.*\\]/s',
+            "dataregex" => '/\\[(blocks path\\=[\\"\'](_.*)[\\"\']\\])/',
             "insert" => 'inlineButWriteRegex0'
         ],
         "textBlock" => [
             "template" => '<div class="###class###" id="###id###">%s</div>',
             "mdregex" => '/.*/',
-            "mdregexStop" => '/^$/',
+            "mdregexStop" => '/^(\\/_.*)?$/', // Stop at blankline or iaWriterBlock
             "dataregex" => '/.*/',
             "insert" => 'multiline'
         ]

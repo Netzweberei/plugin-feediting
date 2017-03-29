@@ -3323,6 +3323,10 @@ Object.assign(Block.prototype, SimpleBlock.fn, require('./block-validations'), {
 
   onBlockRender: function() {
     //this.focus();
+    /* Remind the user to save his changes */
+    this.getTextBlock().bind('DOMSubtreeModified', function(){
+      $(".st-submit input[type=submit]").css("background-color","#990000");
+    });
   },
 
   onDrop: function(dataTransferObj) {},
@@ -3454,7 +3458,6 @@ Object.assign(Block.prototype, SimpleBlock.fn, require('./block-validations'), {
     if (_.isUndefined(this.text_block)) {
       this.text_block = this.$('.st-text-block');
     }
-
     return this.text_block;
   },
 
@@ -4269,7 +4272,7 @@ module.exports = Block.extend({
 "use strict";
 
 module.exports = {
-  debug: true,
+  debug: false,
   skipValidation: false,
   version: "0.4.0",
   language: "en",
@@ -6152,7 +6155,7 @@ var urlRegex = /^(?:([A-Za-z]+):)?(\/{0,3})([0-9.\-A-Za-z]+)(?::(\d+))?(?:\/([^?
 var utils = {
   log: function() {
     if (!_.isUndefined(console) && config.debug) {
-      //console.log.apply(console, arguments);
+      console.log.apply(console, arguments);
     }
   },
 

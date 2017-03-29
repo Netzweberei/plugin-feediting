@@ -348,10 +348,26 @@ class SirTrevorContent extends FeeditableContent
 
     public function loadAvailableWidgets()
     {
-        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
 
+//        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
         $ret = ['type' => 'widget'];
-        $ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
+        $ret['data'] = [
+            'available' => [
+                0 => [
+                    'name' => 'box 1',
+                    'icon' => 'widget',
+                    'type' => '_box',
+                    'uri' => '_box'
+                ],
+                1 => [
+                    'name' => 'box 2',
+                    'icon' => 'widget',
+                    'type' => '_box',
+                    'uri' => '_box'
+                ]
+            ]
+        ];
+//        $ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
 
         die(json_encode($ret));
     }

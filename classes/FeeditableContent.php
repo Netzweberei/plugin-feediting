@@ -331,6 +331,9 @@ class FeeditableContent
                                 preg_match(@$b_def['mdregexStop'], $line, $test) == 0
                                 && $ctr
                             );
+
+                            // Rewind after
+                            prev($lines);
                         }
 
                         break;

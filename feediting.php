@@ -42,7 +42,7 @@ class FeeditingPlugin
 
     private $editor = 'Feeditable';
 
-    private $editorOptions = ['Build', 'Preview'];
+    private $editorOptions = ['Build', 'Review'];
 
     private $cmd;
 
@@ -116,6 +116,8 @@ class FeeditingPlugin
             case 'Jeditable':
             case 'SimpleMDE':
             case 'Preview':
+            case 'Review':
+            case 'Edit':
             default:
                 $this->userEditor = 'SimpleMDE';
         }
@@ -277,7 +279,11 @@ class FeeditingPlugin
 
             $this->page = $page;
 
-            if(@$_GET['editor'] == 'iframe') $this->page->layout = 'iframeeditor.html';
+            switch($page->layout){
+                case '':
+                case 'default.html':
+                    $this->page->layout = 'widgets/block.html';
+            }
 
             $this->cmd  = @$_REQUEST['cmd'];
 
@@ -598,13 +604,13 @@ class FeeditingPlugin
                         list($domId, $elemId, $subElemId) = $test;
                     }
 
-                    if ($subElemId !== false && $_POST[$elemId][$subElemId]) {
+                    if ($subElemId !== false && isset($_POST[$elemId][$subElemId])) {
 
                         if (!$segmentContent->setContentBlockById($segmentId, (string)$_POST[$elemId][$subElemId])) {
                             return $ret;
                         }
                     }
-                    elseif ($_POST[$elemId]) {
+                    elseif (isset($_POST[$elemId])) {
 
                         if (!$segmentContent->setContentBlockById($elemId, (string)$_POST[$elemId])) {
                             return $ret;
@@ -756,16 +762,22 @@ class FeeditingPlugin
                 $options .= '<a href="/?editor=' . $editor . '" '.(@$_SESSION['NWeditor'] == $editor ? 'style="font-weight:bold" class="selected"':'').'>' . $editor . '</a>';
             }
             $this->includeIntoAdminpanel(
-                '<div class="feeditingpanel"><a name="FeditableContent">Inline-access:</a>' . $options . '</div>'
+                '<div class="feeditingpanel"><a name="FeditableContent"></a>' . $options . '</div>'
             );
         }
         $this->includeIntoHeader($this->self . 'assets/css/feediting.css');
         $this->getEditablesCssConfig($this->self);
         $this->getEditablesJsConfig($this->self);
 
-        $content = strtr($response->getContent(), $this->replace_pairs);
+//        // @todo: remove after testing!
+//        $this->lateEditableContent['widgets'] = $this->editableContent['widgets'];
+//        $this->includeIntoAdminpanel('<div style="border: 1px solid red;">+++subsegment-widgets+++</div>');
 
-        if($this->parseSubsegments){
+        $content = $response->getContent();
+        $content = strtr($content, $this->replace_pairs);
+
+        if($this->parseSubsegments)
+        {
             // replace late-editor-contents at last
             $late_replace_pairs = [];
             foreach ($this->lateEditableContent as $editorId => $editor) {

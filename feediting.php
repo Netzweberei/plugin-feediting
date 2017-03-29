@@ -42,7 +42,7 @@ class FeeditingPlugin
 
     private $editor = 'Feeditable';
 
-    private $editorOptions = ['Build', 'Review'];
+    private $editorOptions = ['SirTrevor' => 'Build', 'SimpleMDE' => 'Review'];
 
     private $cmd;
 
@@ -101,26 +101,15 @@ class FeeditingPlugin
 
         // let the user decide, which editor to use
         $this->userEditor = $this->config->get('plugins.config.feediting.editor');
-        if ($this->userEditor == 'UserEditor' && isset($_GET['editor'])) {
-            $_SESSION['NWeditor'] = $_GET['editor'];
+        if (
+            $this->userEditor == 'UserEditor'
+            && isset($_GET['editor'])
+            && in_array($_GET['editor'], $this->editorOptions)
+        ){
+            $editor = array_flip($this->editorOptions);
+            $_SESSION['NWeditor'] = $editor[$_GET['editor']];
         }
-        switch (@$_SESSION['NWeditor']) {
-            case 'Htmlforms':
-                $this->userEditor = 'Feeditable';
-                break;
-            case 'Build':
-            case 'SirTrevor':
-            case 'Inline-access':
-                $this->userEditor = 'SirTrevor';
-                break;
-            case 'Jeditable':
-            case 'SimpleMDE':
-            case 'Preview':
-            case 'Review':
-            case 'Edit':
-            default:
-                $this->userEditor = 'SimpleMDE';
-        }
+        $this->userEditor = $_SESSION['NWeditor'];
 
         // set editor
         switch ($this->userEditor) {
@@ -279,24 +268,26 @@ class FeeditingPlugin
 
             $this->page = $page;
 
-            switch($page->layout){
-                case '':
-                case 'default.html':
-                    $this->page->layout = 'widgets/block.html';
+            if(
+                isset($_REQUEST['editor'])
+                && 'iframe' == $_REQUEST['editor']
+                && 'default.html' == $page->layout
+            ){
+                $this->page->layout = 'widgets/block.html';
             }
 
             $this->cmd  = @$_REQUEST['cmd'];
 
             $segmentId = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : '0';
             $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
-            if (
+            if(
                 isset($_REQUEST['cmd'])
                 && in_array($segmentId, array_keys($this->editableContent))
                 && is_subclass_of($this->editableContent[$segmentId],
                     '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
                 )
                 && is_callable([$this->editableContent[$segmentId], $_REQUEST['cmd']])
-            ) {
+            ){
                 $this->cmd = $this->editableContent[$segmentId]->{$this->cmd}();
             }
             $this->editPage($_twigify);
@@ -758,8 +749,8 @@ class FeeditingPlugin
 
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
-            foreach ($this->editorOptions as $editor) {
-                $options .= '<a href="/?editor=' . $editor . '" '.(@$_SESSION['NWeditor'] == $editor ? 'style="font-weight:bold" class="selected"':'').'>' . $editor . '</a>';
+            foreach ($this->editorOptions as $editor => $option) {
+                $options .= '<a href="?editor=' . $option . '" '.(@$_SESSION['NWeditor'] == $editor ? 'style="color:white" class="selected"':'').'>' . $option . '</a>';
             }
             $this->includeIntoAdminpanel(
                 '<div class="feeditingpanel"><a name="FeditableContent"></a>' . $options . '</div>'
@@ -769,12 +760,7 @@ class FeeditingPlugin
         $this->getEditablesCssConfig($this->self);
         $this->getEditablesJsConfig($this->self);
 
-//        // @todo: remove after testing!
-//        $this->lateEditableContent['widgets'] = $this->editableContent['widgets'];
-//        $this->includeIntoAdminpanel('<div style="border: 1px solid red;">+++subsegment-widgets+++</div>');
-
-        $content = $response->getContent();
-        $content = strtr($content, $this->replace_pairs);
+        $content = strtr($response->getContent(), $this->replace_pairs);
 
         if($this->parseSubsegments)
         {

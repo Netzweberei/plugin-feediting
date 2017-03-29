@@ -26,14 +26,14 @@ class JeditableContent extends FeeditableContent
             "insert" => 'array'
         ],
         "iaWriterBlock" => [
-            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s?editor=iframe" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
             "mdregex" => '/(?<=^)\\/_.*/s',
             "dataregex" => '/(\/(_.*)\.md)/',
             "insert" => 'inlineButWriteRegex0'
         ],
 
         // @todo: define a filename and use the default path instead!
-        "blocksBlock" => [
+        "widgetBlock" => [
             "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/_index/test?path=%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
             "mdregex" => '/(?<=^)\\[.*\\]/s',
             "dataregex" => '/\\[(blocks path\\=[\\"\'](_.*)[\\"\']\\])/',
@@ -67,7 +67,6 @@ class JeditableContent extends FeeditableContent
 
     public function getEditableContainer($contentId, $content)
     {
-
         if ($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave) {
             return
                 '<div class="' . $this->pluginConfig['contentSegment_WrapperPrefix'] . $contentId . '">

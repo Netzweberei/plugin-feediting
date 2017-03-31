@@ -107,9 +107,9 @@ class FeeditingPlugin
             && in_array($_GET['editor'], $this->editorOptions)
         ){
             $editor = array_flip($this->editorOptions);
-            $_SESSION['NWeditor'] = $editor[$_GET['editor']];
+            @$_SESSION['NWeditor'] = $editor[$_GET['editor']];
         }
-        $this->userEditor = $_SESSION['NWeditor'];
+        $this->userEditor = @$_SESSION['NWeditor'];
 
         // set editor
         switch ($this->userEditor) {

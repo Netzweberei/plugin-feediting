@@ -391,6 +391,21 @@ class FeeditableContent
                                         );
                                         break;
 
+                                    case 'inlineFilter':
+                                        $path = preg_filter($b_def['datafilter'], $b_def['datareplace'], $line);
+                                        if(isset($b_def['trim'])){
+                                            $path = trim($path, $b_def['trim']);
+                                        }
+                                        $this->blocks[$lineno] = $this->insertEditableTag(
+                                            $lineno,
+                                            $class,
+                                            'auto',
+                                            $b_type,
+                                            '',
+                                            [$path]
+                                        );
+                                        break;
+
                                     case 'ownlineButWriteRegex0':
                                         $this->blocks[$lineno] = $this->insertEditableTag(
                                             $lineno,

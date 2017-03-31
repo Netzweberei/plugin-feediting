@@ -31,13 +31,30 @@ class JeditableContent extends FeeditableContent
             "dataregex" => '/(\/(_.*)\.md)/',
             "insert" => 'inlineButWriteRegex0'
         ],
-
-        // @todo: define a filename and use the default path instead!
-        "widgetBlock" => [
-            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/_index/test?path=%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
-            "mdregex" => '/(?<=^)\\[.*\\]/s',
-            "dataregex" => '/\\[(blocks path\\=[\\"\'](_.*)[\\"\']\\])/',
+        "blocksBlock" => [
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/_index?%s?editor=iframe" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "mdregex" => '/(?<=^)\\[blocks\\]/s',
+            "dataregex" => '/\[(blocks)\]/',
             "insert" => 'inlineButWriteRegex0'
+        ],
+        "widgetBlock" => [
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "mdregex" => '/(?<=^)\\[blocks\s.*\\]/s',
+            "dataregex" => '/\[blocks\s(.*)\]/',
+            "datafilter" => [
+                '/\[blocks\s/',
+                '/\]/',
+                '/\@page\//',
+                '/(?:widget=["\']([^"\'].*)?["\'](?:[^\=].*)path=["\']([^"\'].*)["\'])|(?:path=["\']([^"\'].*)["\'](?:[^\=].*widget=["\']([^"\'].*)?["\'])?)/'
+            ],
+            "datareplace" => [
+                '',
+                '',
+                '',
+                '$2/$1/$3/$4'
+            ],
+            "trim" => '/',
+            "insert" => 'inlineFilter'
         ],
         "textBlock" => [
             "template" => '<div class="###class###" id="###id###">%s</div>',
@@ -67,6 +84,10 @@ class JeditableContent extends FeeditableContent
 
     public function getEditableContainer($contentId, $content)
     {
+        // bugfix: Remask masked shortcodes, eg "[[foo]]"
+        // @todo: do this within the respective container
+        $content = preg_replace('/\\[([^\\]].*)\\]/', '[[$1]]', $content);
+
         if ($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave) {
             return
                 '<div class="' . $this->pluginConfig['contentSegment_WrapperPrefix'] . $contentId . '">

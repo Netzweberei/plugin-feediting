@@ -392,17 +392,23 @@ class FeeditableContent
                                         break;
 
                                     case 'inlineFilter':
-                                        $path = preg_filter($b_def['datafilter'], $b_def['datareplace'], $line);
-                                        if(isset($b_def['trim'])){
-                                            $path = trim($path, $b_def['trim']);
+                                        if(isset($b_def['userfunc'])) {
+                                            $test = call_user_func(array($this->plugin->page, $b_def['userfunc']));
+                                            $filter = preg_filter($b_def['datafilter'], $b_def['datareplace'], $test);
+                                        } else {
+                                            $filter = preg_filter($b_def['datafilter'], $b_def['datareplace'], $line);
                                         }
+                                        if(isset($b_def['trim'])){
+                                            $filter = trim($filter, $b_def['trim']);
+                                        }
+                                        $b_data[] = $filter;
                                         $this->blocks[$lineno] = $this->insertEditableTag(
                                             $lineno,
                                             $class,
                                             'auto',
                                             $b_type,
                                             '',
-                                            [$path]
+                                            $b_data
                                         );
                                         break;
 

@@ -32,15 +32,23 @@ class JeditableContent extends FeeditableContent
             "insert" => 'inlineButWriteRegex0'
         ],
         "blocksBlock" => [
-            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/_index?%s?editor=iframe" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%2$s" style="width: 100%%; border: 0px solid lime;" scrolling="no">%s</iframe>',
             "mdregex" => '/(?<=^)\\[blocks\\]/s',
-            "dataregex" => '/\[(blocks)\]/',
-            "insert" => 'inlineButWriteRegex0'
+            "dataregex" => '/(\[blocks\])/',
+            "userfunc" => 'getDefaultBlocksPath',
+            "datafilter" => [
+                '/\@page\//',
+            ],
+            "datareplace" => [
+                '',
+            ],
+            "trim" => '',
+            "insert" => 'inlineFilter'
         ],
         "widgetBlock" => [
-            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%s" style="width: 100%%; border: 0px solid lime;" scrolling="no"></iframe>',
+            "template" => '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/%2$s" style="width: 100%%; border: 0px solid lime;" scrolling="no">%s</iframe>',
             "mdregex" => '/(?<=^)\\[blocks\s.*\\]/s',
-            "dataregex" => '/\[blocks\s(.*)\]/',
+            "dataregex" => '/(\[blocks\s.*\])/',
             "datafilter" => [
                 '/\[blocks\s/',
                 '/\]/',

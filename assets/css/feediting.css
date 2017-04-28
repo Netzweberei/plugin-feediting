@@ -15,7 +15,7 @@
     left: 0;
 }
 
-.adminpanel + div,header {
+body {
     margin-top: 34px;
 }
 

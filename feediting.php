@@ -50,7 +50,8 @@ class FeeditingPlugin
 
     private $parseSubsegments = false;
 
-    private $subsegment_match = '/(?P<beforegrid>.*?)(?:(?P<grid>(?!<\<gridend>)(?P<gridstart>^-{2}\s+grid\s+.+?-{2}).(?P<gridcontent>.*?).(?P<gridend>-{2}\s+grid\s+-{2})))/msi';
+    /* @see: https://regex101.com/r/gCaxqW/1 */
+    private $subsegment_match = '/((?P<beforegrid>.*?)(?:(?P<grid>(?!<\<gridend>)(?P<gridstart>^-{2}\s+grid\s+.+?-{2}).(?P<gridcontent>.*?).(?P<gridend>-{2}\s+grid\s+-{2})))|(?P<aftergrid>.{2,}))/msi';
 
     private $subsegmentid_format = '%s[%s]';
 
@@ -61,7 +62,7 @@ class FeeditingPlugin
     public function __construct()
     {
         $this->config = DI::get('Config');
-        $this->alias  = DI::get('Alias');
+        $this->alias = DI::get('Alias');
         $this->authenticated = $this->isAuthenticated();
     }
 
@@ -105,7 +106,7 @@ class FeeditingPlugin
             $this->userEditor == 'UserEditor'
             && isset($_GET['editor'])
             && in_array($_GET['editor'], $this->editorOptions)
-        ){
+        ) {
             $editor = array_flip($this->editorOptions);
             @$_SESSION['NWeditor'] = $editor[$_GET['editor']];
         }
@@ -134,6 +135,7 @@ class FeeditingPlugin
     public function getConfig()
     {
         $config = $this->config->toArray();
+
         return $config['plugins']['config']['feediting'];
     }
 
@@ -158,13 +160,13 @@ class FeeditingPlugin
 
             // include a tag:
             if (substr($uri, 0, 2) == '</') {
-                $this->replace_pairs[$tag] = $uri . PHP_EOL . $this->replace_pairs[$tag];
+                $this->replace_pairs[$tag] = $uri.PHP_EOL.$this->replace_pairs[$tag];
             } else {
-                $this->replace_pairs[$tag] = $this->replace_pairs[$tag] . PHP_EOL . $uri . PHP_EOL;
+                $this->replace_pairs[$tag] = $this->replace_pairs[$tag].PHP_EOL.$uri.PHP_EOL;
             }
+
             return;
-        }
-        else {
+        } else {
 
             $assetAtoms = $this->provideAsset($uri);
             switch (end($assetAtoms)) {
@@ -180,7 +182,7 @@ class FeeditingPlugin
                     return;
             }
         }
-        $this->replace_pairs[$tag] = sprintf($tmpl, implode($assetAtoms)) . PHP_EOL . $this->replace_pairs[$tag];
+        $this->replace_pairs[$tag] = sprintf($tmpl, implode($assetAtoms)).PHP_EOL.$this->replace_pairs[$tag];
     }
 
     public function provideAsset($uri)
@@ -195,20 +197,20 @@ class FeeditingPlugin
         if (strpos($webdir, '://') > 1) {
 
             $pathPrefix = '';
-        }
-        else {
+        } else {
 
-            $pathPrefix = DS . 'assets';
+            $pathPrefix = DS.'assets';
 
             // copy src to assets
-            $webpath = $pathPrefix . $webdir . DS . $pathinfo['basename'];
-            $abspath = $this->alias->get('@web') . $webpath;
+            $webpath = $pathPrefix.$webdir.DS.$pathinfo['basename'];
+            $abspath = $this->alias->get('@web').$webpath;
             if (!file_exists($abspath)) {
                 @mkdir(dirname($abspath), 0777, true);
                 copy($uri, $abspath);
             }
         }
-        return [$pathPrefix, $webdir . DS, $pathinfo['filename'], '.' . $pathinfo['extension']];
+
+        return [$pathPrefix, $webdir.DS, $pathinfo['filename'], '.'.$pathinfo['extension']];
     }
 
     public function includeBeforeBodyEnds($uri)
@@ -255,7 +257,9 @@ class FeeditingPlugin
 
     protected function onPageLoaded(\Herbie\Page $page)
     {
-        if(!$this->isRealPage($page)) return;
+        if (!$this->isRealPage($page)) {
+            return;
+        }
 
         $this->recursivePageLoads++;
         if (
@@ -268,36 +272,39 @@ class FeeditingPlugin
 
             $this->page = $page;
 
-            if(
+            if (
                 isset($_REQUEST['editor'])
                 && 'iframe' == $_REQUEST['editor']
                 && 'default.html' == $page->layout
-            ){
+            ) {
                 $this->page->layout = 'widgets/block.html';
             }
 
-            $this->cmd  = @$_REQUEST['cmd'];
+            $this->cmd = @$_REQUEST['cmd'];
 
             $segmentId = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : '0';
             $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
-            if(
+            if (
                 isset($_REQUEST['cmd'])
                 && in_array($segmentId, array_keys($this->editableContent))
-                && is_subclass_of($this->editableContent[$segmentId],
+                && is_subclass_of(
+                    $this->editableContent[$segmentId],
                     '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
                 )
                 && is_callable([$this->editableContent[$segmentId], $_REQUEST['cmd']])
-            ){
+            ) {
                 $this->cmd = $this->editableContent[$segmentId]->{$this->cmd}();
             }
             $this->editPage($_twigify);
         }
     }
 
-    private function isRealPage($page = null){
-        if($page && stripos($page->getPath(), '@plugin')!==false){
+    private function isRealPage($page = null)
+    {
+        if ($page && stripos($page->getPath(), '@plugin') !== false) {
             $this->isRealPage = false;
         }
+
         return $this->isRealPage;
     }
 
@@ -310,6 +317,7 @@ class FeeditingPlugin
             case '@post':
                 return true;
         }
+
         return false;
     }
 
@@ -322,50 +330,64 @@ class FeeditingPlugin
             $this->segments = array_merge(array('0' => PHP_EOL), $this->segments);
         }
 
-        foreach ($this->segments as $segmentId => $segmentContents)
-        {
+        foreach ($this->segments as $segmentId => $segmentContents) {
             // special case: segment with "grid-elements"
+            //todo: get subsegment_match from contentblock
             preg_match_all($this->subsegment_match, $segmentContents, $captured);
             if ($this->parseSubsegments && count($captured['grid']) > 0) {
 
                 // grid(s) found, build a "segmented" segment
-                foreach ($captured['grid'] as $gid => $g)
-                {
+                //todo: delegate this to contentblock?
+                foreach ($captured['grid'] as $gid => $g) {
                     // make the text preceding the grid editable
-                    $offset = $this->buildEditableSegment($segmentId, $captured['beforegrid'][$gid], 0, true);
+                    $beforegrid = trim($captured['beforegrid'][$gid]);
+                    if ($beforegrid != '') {
+                        $offset = $this->buildEditableSegment($segmentId, $captured['beforegrid'][$gid], 0, true);
+                    }
 
                     // append the gridstart as uneditable text
-                    $this->segments[$segmentId][] = $captured['gridstart'][$gid];
+                    $this->segments[$segmentId][] = PHP_EOL.$captured['gridstart'][$gid].PHP_EOL;
 
                     $cols = preg_split('/\\n+--\\n+/', $captured['gridcontent'][$gid]);
-                    foreach ($cols as $col => $colcontent)
-                    {
+                    foreach ($cols as $col => $colcontent) {
                         if ($col > 0) {
                             // append the grid-delimiter as uneditable text
-                            $this->segments[$segmentId][] = PHP_EOL . '--' . PHP_EOL;
+                            $this->segments[$segmentId][] = PHP_EOL.'--'.PHP_EOL;
                         }
                         // append the contents as editable text
-                        $offset = $this->buildEditableSegment($segmentId, $colcontent, $offset, true);
+                        $colcontent = trim($colcontent);
+                        if ($colcontent != '') {
+                            $offset = $this->buildEditableSegment($segmentId, $colcontent, $offset, true);
+                        }
                     }
 
                     // append the gridend as uneditable text
-                    $this->segments[$segmentId][] = PHP_EOL . $captured['gridend'][$gid] . PHP_EOL;
+                    $this->segments[$segmentId][] = PHP_EOL.$captured['gridend'][$gid].PHP_EOL;
+
+                    // make the text trailing the grid editable
+                    $aftergrid = trim($captured['aftergrid'][$gid]);
+                    if ($aftergrid != '') {
+                        $offset = $this->buildEditableSegment($segmentId, $captured['aftergrid'][$gid], 0, true);
+                    }
                 }
-            }
-            else {
-                $this->buildEditableSegment($segmentId, $segmentContents);
+            } else {
+                $segmentContents = trim($segmentContents);
+                if ($segmentContents != '') {
+                    $this->buildEditableSegment($segmentId, $segmentContents);
+                }
             }
         }
 
         // use one of the editors for common tasks
         $anyEditables = array_merge($this->editableContent, $this->lateEditableContent);
         $anyEditable = reset($anyEditables);
-        while(
+        while (
             !is_a($anyEditable, 'herbie\\plugin\\feediting\\classes\\FeeditableContent')
             && $anyEditable = next($anyEditables)
-        ){
+        ) {
             ;//donothing
         }
+
         return $anyEditable->getSegmentLoadedMsg();
     }
 
@@ -383,16 +405,16 @@ class FeeditingPlugin
             $this->lateEditableContent[$subsegmentId] = new $contentEditor($this, $this->page->format, $subsegmentId);
             $offset = $this->lateEditableContent[$subsegmentId]->setContentBlocks($content, $offset);
 
-            $this->segments[$segmentId][] = sprintf($this->subsegment_placeholder,$subsegmentId);
+            $this->segments[$segmentId][] = sprintf($this->subsegment_placeholder, $subsegmentId);
             // Register a "pseudo"-segment, needed for initializing the js-editors
             $this->segments[$subsegmentId] = true;
-        }
-        else {
+        } else {
 
             $this->editableContent[$segmentId] = new $contentEditor($this, $this->page->format, $segmentId);
             $this->editableContent[$segmentId]->setContentBlocks($content);
             $this->segments[$segmentId] = $this->editableContent[$segmentId]->getSegment();
         }
+
         return $offset;
     }
 
@@ -413,22 +435,20 @@ class FeeditingPlugin
                         $fh = fopen($this->path, 'w');
                         fputs($fh, $fheader);
 
-                        foreach ($this->segments as $segmentId => $segmentContents)
-                        {
-                            if($this->recognizePseudoSegmentById($segmentId)){
+                        foreach ($this->segments as $segmentId => $segmentContents) {
+                            if ($this->recognizePseudoSegmentById($segmentId)) {
                                 continue;
                             }
 
                             $_modifiedContent[$segmentId] = '';
 
                             if ($segmentId != '0' && $segmentContents !== true) {
-                                fputs($fh, PHP_EOL . "--- {$segmentId} ---" . PHP_EOL);
+                                fputs($fh, PHP_EOL."--- {$segmentId} ---".PHP_EOL);
                             }
 
                             if ($this->parseSubsegments && is_array($segmentContents)) {
 
-                                foreach ($segmentContents as $subsegmentId => $subsegmentContent)
-                                {
+                                foreach ($segmentContents as $subsegmentId => $subsegmentContent) {
                                     $subsegmentId = sprintf($this->subsegmentid_format, $segmentId, $subsegmentId);
 
                                     // search for responsible editors
@@ -439,21 +459,18 @@ class FeeditingPlugin
                                             $this->lateEditableContent[$subsegmentId]->getFormat(),
                                             true
                                         );
-                                    }
-                                    elseif (in_array($subsegmentId, array_keys($this->editableContent))) {
+                                    } elseif (in_array($subsegmentId, array_keys($this->editableContent))) {
 
                                         $_modifiedContent[$segmentId] .= $this->renderRawContent(
                                             $this->editableContent[$subsegmentId]->getSegment(false),
                                             $this->editableContent[$subsegmentId]->getFormat(),
                                             true
                                         );
-                                    }
-                                    else {
+                                    } else {
                                         $_modifiedContent[$segmentId] .= $subsegmentContent;
                                     }
                                 }
-                            }
-                            else {
+                            } else {
                                 $_modifiedContent[$segmentId] = $this->renderRawContent(
                                     $this->editableContent[$segmentId]->getSegment(false),
                                     $this->editableContent[$segmentId]->getFormat(),
@@ -466,11 +483,14 @@ class FeeditingPlugin
                     }
 
                     // return early or reload (recalculate block-indexes)
-                    if($this->cmd == 'saveAndReturn') return;
-                    else $this->cmd = 'reload';
+                    if ($this->cmd == 'saveAndReturn') {
+                        return;
+                    } else {
+                        $this->cmd = 'reload';
+                    }
 
                     $this->page->load($this->page->getPath());
-                    $_twigify        = ($this->loadEditableSegments() == 'twigify') ? true : false;
+                    $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
                     $editableContent = isset($this->lateEditableContent[$changed['segmentid']])
                         ? 'lateEditableContent'
                         : 'editableContent';
@@ -482,12 +502,14 @@ class FeeditingPlugin
 
                         // make changed content editable again, push it into page
                         $this->page->setSegments(
-                            [$changed['segmentid'] => $this->renderEditableContent(
-                                $changed['segmentid'],
-                                $changed_segment,
-                                $changed['contenttype'],
-                                $_twigify
-                            )]
+                            [
+                                $changed['segmentid'] => $this->renderEditableContent(
+                                    $changed['segmentid'],
+                                    $changed_segment,
+                                    $changed['contenttype'],
+                                    $_twigify
+                                ),
+                            ]
                         );
 
                         // get segment from page
@@ -503,8 +525,7 @@ class FeeditingPlugin
 
                         // dont reload but render only this 'partial'
                         die($content);
-                    }
-                    else {
+                    } else {
 
                         // make all segments editable again for full page-reload
                         foreach ($this->segments as $id => $_segment) {
@@ -520,18 +541,17 @@ class FeeditingPlugin
                 break;
 
             default:
-                foreach ($this->segments as $id => $_segment)
-                {
+                foreach ($this->segments as $id => $_segment) {
                     if ($this->parseSubsegments && is_array($_segment)) {
 
                         $this->segments[$id] = '';
-                        foreach ($_segment as $subCtr => $_subsegment)
-                        {
+                        foreach ($_segment as $subCtr => $_subsegment) {
                             $_subsegmentid = sprintf($this->subsegmentid_format, $id, $subCtr);
 
                             if (
                                 array_key_exists($_subsegmentid, $this->editableContent)
-                                && is_subclass_of($this->editableContent[$_subsegmentid],
+                                && is_subclass_of(
+                                    $this->editableContent[$_subsegmentid],
                                     'herbie\plugin\feediting\classes\FeeditableContent'
                                 )
                             ) {
@@ -544,8 +564,7 @@ class FeeditingPlugin
                                 );
                                 // Register a "pseudo"-segment, needed for initializing the js-editors
                                 $this->segments[$_subsegmentid] = true;
-                            }
-                            else {
+                            } else {
 
                                 $this->segments[$id] .= $this->renderContent(
                                     $_subsegmentid,
@@ -567,27 +586,30 @@ class FeeditingPlugin
     {
 
         $this->replace_pairs = [];
-        $anyEditor           = reset($this->editableContent);
-        $posted              = $anyEditor->decodeEditableId($_POST['id']);
-        $editableContent     = ($this->parseSubsegments && isset($this->lateEditableContent[$posted['segmentid']]))
+        $anyEditor = $this->parseSubsegments ? reset($this->lateEditableContent) : reset($this->editableContent);
+        $posted = $anyEditor->decodeEditableId($_POST['id']);
+        $editableContent = ($this->parseSubsegments && isset($this->lateEditableContent[$posted['segmentid']]))
             ? 'lateEditableContent'
             : 'editableContent';
-        $ret                 = [
+        $ret = [
             'elemid' => false,
             'segmentid' => false,
-            'contenttype' => false
+            'contenttype' => false,
         ];
 
-        if ( !isset($this->{$editableContent}[$posted['segmentid']])) return $ret;
+        if (!isset($this->{$editableContent}[$posted['segmentid']])) {
+            return $ret;
+        }
 
-        if ( $this->{$editableContent}[$posted['segmentid']]->collectAllChanges === true) {
+        if ($this->{$editableContent}[$posted['segmentid']]->collectAllChanges === true) {
 
-            $doEditableContents = $this->parseSubsegments ? ['editableContent','lateEditableContent'] : ['editableContent'];
+            $doEditableContents = $this->parseSubsegments ? [
+                'editableContent',
+                'lateEditableContent',
+            ] : ['editableContent'];
 
-            foreach($doEditableContents as $editableContent)
-            {
-                foreach ($this->{$editableContent} as $segmentId => $segmentContent)
-                {
+            foreach ($doEditableContents as $editableContent) {
+                foreach ($this->{$editableContent} as $segmentId => $segmentContent) {
                     $elemId = $segmentContent->encodeEditableId($segmentId);
                     $subElemId = false;
 
@@ -600,8 +622,7 @@ class FeeditingPlugin
                         if (!$segmentContent->setContentBlockById($segmentId, (string)$_POST[$elemId][$subElemId])) {
                             return $ret;
                         }
-                    }
-                    elseif (isset($_POST[$elemId])) {
+                    } elseif (isset($_POST[$elemId])) {
 
                         if (!$segmentContent->setContentBlockById($elemId, (string)$_POST[$elemId])) {
                             return $ret;
@@ -609,10 +630,13 @@ class FeeditingPlugin
                     }
                 }
             }
-        }
-        else {
+        } else {
 
-            if (!$this->{$editableContent}[$posted['segmentid']]->setContentBlockById($posted['elemid'], (string)$_POST['value'])) {
+            if (!$this->{$editableContent}[$posted['segmentid']]->setContentBlockById(
+                $posted['elemid'],
+                (string)$_POST['value']
+            )
+            ) {
                 return $ret;
             }
         }
@@ -637,7 +661,7 @@ class FeeditingPlugin
             $fbody = '';
             while (($buffer = fgets($fh)) !== false) {
                 $fpart = isset($fpart) ? $fpart : 'header';
-                ${'f' . $fpart} .= $buffer;
+                ${'f'.$fpart} .= $buffer;
                 $currline++;
                 if ($currline > 1 && strpos($buffer, '---') !== false) {
                     $fpart = 'body';
@@ -654,6 +678,7 @@ class FeeditingPlugin
     {
         parse_str($segmentId, $arr);
         $test = reset($arr);
+
         return (is_array($test)) ? true : false;
     }
 
@@ -662,11 +687,12 @@ class FeeditingPlugin
         $ret = strtr(
             $content,
             [
-                constant(strtoupper($format) . '_EOL') => $stripLF ? '' : PHP_EOL,
-                'MARKDOWN_EOL' => PHP_EOL
+                constant(strtoupper($format).'_EOL') => $stripLF ? '' : PHP_EOL,
+                'MARKDOWN_EOL' => PHP_EOL,
             ]
         );
         $ret = strtr($ret, $this->remove_pairs);
+
         return $ret;
     }
 
@@ -677,8 +703,7 @@ class FeeditingPlugin
 
         if ($this->parseSubsegments && is_array($content)) {
 
-            foreach ($content as $subcontentId => $subcontent)
-            {
+            foreach ($content as $subcontentId => $subcontent) {
                 $subsegmentId = sprintf($this->subsegmentid_format, $contentId, $subcontentId);
                 if (isset($this->editableContent[$subsegmentId])) {
 
@@ -689,19 +714,18 @@ class FeeditingPlugin
 
                     // Register a "pseudo"-segment, needed for initializing the js-editors
                     $this->segments[$subsegmentId] = true;
-                }
-                else {
+                } else {
                     $ret .= strtr($subcontent, $this->replace_pairs);
                 }
             }
-        }
-        elseif (isset($this->editableContent[$contentId])) {
+        } elseif (isset($this->editableContent[$contentId])) {
 
             $ret = $this->editableContent[$contentId]->getEditableContainer(
                 $contentId,
                 strtr($content, $this->replace_pairs)
             );
         }
+
         return $ret;
     }
 
@@ -710,9 +734,10 @@ class FeeditingPlugin
         if ($twigify && !empty($content)) {
 
             //$content = DI::get('Twig')->renderString($content);
-            $content = strtr($content, array(constant(strtoupper($format) . '_EOL') => PHP_EOL));
+            $content = strtr($content, array(constant(strtoupper($format).'_EOL') => PHP_EOL));
             $content = Hook::trigger(Hook::FILTER, 'renderContent', $content, $this->page->getData());
         }
+
         return $content;
     }
 
@@ -726,11 +751,11 @@ class FeeditingPlugin
             parse_str($segmentId, $register);
             $segment_register = $register + $segment_register;
         }
-        if($this->parseSubsegments){
-            foreach ($segment_register as $segmentId => $v ) {
-                if(!is_array($segment_register[$segmentId])){
-                    $editableContainer    = $segments[$segmentId];
-                    $containerPlaceholder = sprintf($this->subsegment_placeholder,$segmentId);
+        if ($this->parseSubsegments) {
+            foreach ($segment_register as $segmentId => $v) {
+                if (!is_array($segment_register[$segmentId])) {
+                    $editableContainer = $segments[$segmentId];
+                    $containerPlaceholder = sprintf($this->subsegment_placeholder, $segmentId);
                     $segments[$segmentId] = $containerPlaceholder;
                     $this->replace_pairs[$containerPlaceholder] = $editableContainer;
                 }
@@ -742,28 +767,29 @@ class FeeditingPlugin
 
     protected function onOutputGenerated($response)
     {
-        if(!$this->isRealPage()) return;
+        if (!$this->isRealPage()) {
+            return;
+        }
 
         $this->response = $response;
-        $this->self = $this->config->get('plugins.path') . '/feediting/';
+        $this->self = $this->config->get('plugins.path').'/feediting/';
 
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
             foreach ($this->editorOptions as $editor => $option) {
-                $options .= '<a href="?editor=' . $option . '" '.(@$_SESSION['NWeditor'] == $editor ? 'style="color:white" class="selected"':'').'>' . $option . '</a>';
+                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="color:white" class="selected"' : '').'>'.$option.'</a>';
             }
             $this->includeIntoAdminpanel(
-                '<div class="feeditingpanel"><a name="FeditableContent"></a>' . $options . '</div>'
+                '<div class="feeditingpanel"><a name="FeditableContent"></a>'.$options.'</div>'
             );
         }
-        $this->includeIntoHeader($this->self . 'assets/css/feediting.css');
+        $this->includeIntoHeader($this->self.'assets/css/feediting.css');
         $this->getEditablesCssConfig($this->self);
         $this->getEditablesJsConfig($this->self);
 
         $content = strtr($response->getContent(), $this->replace_pairs);
 
-        if($this->parseSubsegments)
-        {
+        if ($this->parseSubsegments) {
             // replace late-editor-contents at last
             $late_replace_pairs = [];
             foreach ($this->lateEditableContent as $editorId => $editor) {
@@ -780,7 +806,7 @@ class FeeditingPlugin
     public function includeIntoAdminpanel($html)
     {
         $adminpanelTag = '<div class="adminpanel">';
-        $this->replace_pairs[$adminpanelTag] = '<div class="adminpanel">' . $html;
+        $this->replace_pairs[$adminpanelTag] = '<div class="adminpanel">'.$html;
     }
 
     public function includeIntoHeader($uri)
@@ -790,14 +816,18 @@ class FeeditingPlugin
 
     private function getEditablesCssConfig($pluginPath)
     {
-        $validKeys = array_keys($this->editableContent);
-        $this->editableContent[@$validKeys[0]]->getEditablesCssConfig($pluginPath);
+        if (!($test = reset($this->editableContent))) {
+            $test = reset($this->lateEditableContent);
+        }
+        $test->getEditablesCssConfig($pluginPath);
     }
 
     private function getEditablesJsConfig($pluginPath)
     {
-        $validKeys = array_keys($this->editableContent);
-        $this->editableContent[$validKeys[0]]->getEditablesJsConfig($pluginPath);
+        if (!($test = reset($this->editableContent))) {
+            $test = reset($this->lateEditableContent);
+        }
+        $test->getEditablesJsConfig($pluginPath);
     }
 
     private function getReplacement($mark)
@@ -817,7 +847,7 @@ class FeeditingPlugin
 
     private function defineLineFeed($format, $eol)
     {
-        $FORMAT_EOL          = $this->getLineFeedMarker($format);
+        $FORMAT_EOL = $this->getLineFeedMarker($format);
         $EDITABLE_FORMAT_EOL = $this->getLineFeedMarker($format, 1);
 
         // used for saving
@@ -836,7 +866,7 @@ class FeeditingPlugin
 
     public function getLineFeedMarker($format, $editable = false)
     {
-        return ($editable ? 'EDITABLE_' : '') . strtoupper($format) . '_EOL';
+        return ($editable ? 'EDITABLE_' : '').strtoupper($format).'_EOL';
     }
 }
 

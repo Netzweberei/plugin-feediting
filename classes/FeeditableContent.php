@@ -12,10 +12,13 @@
 namespace herbie\plugin\feediting\classes;
 
 use herbie\plugin\feediting\FeeditingPlugin;
-use Herbie\DI;
+
+//use Herbie\DI;
 
 class FeeditableContent
 {
+
+    public $plugin;
 
     public $collectAllChanges = false;
 
@@ -23,11 +26,17 @@ class FeeditableContent
 
     public $editableEmptySegmentContent = "\nclick to edit\n";
 
-    protected $blocks = [];
+    public $currBlockId = false;
 
-    protected $format = '';
+    public $remToCloseCurrentBlockWith = '';
 
-    protected $plugin;
+    public $blocks = [];
+
+    public $pluginConfig = [];
+
+    public $currSegmentId = false;
+
+    public $format = '';
 
     protected $segmentid = 0;
 
@@ -35,24 +44,13 @@ class FeeditableContent
 
     protected $blockDimension = 100;
 
-    protected $pluginConfig = [];
-
     protected $eob = PHP_EOL;
 
-    protected $contentBlocks = [
-        "textBlock" => [
-            "template" => '<input type="hidden" name="id" value="###id###"/><textarea name="value">%s</textarea><input type="submit" name="cmd" value="save"/>',
-            "mdregex" => '/.*/',
-            "dataregex" => '/.*/',
-            "insert" => 'array'
-        ]
-    ];
+    protected $contentBlocks = [];
 
     protected $tmplstrSeparator = '%s';
 
-    protected $remToCloseCurrentBlockWith = '';
-
-    public function __construct(FeeditingPlugin &$plugin, $format, $segmentid = null, $eob = null)
+    public function __construct(FeeditingPlugin &$plugin, $format, $segmentid = null, $eob = false)
     {
         $this->plugin = $plugin;
         $this->format = $format;
@@ -61,7 +59,7 @@ class FeeditableContent
         if ($segmentid) {
             $this->segmentid = $segmentid;
         }
-        if ($eob) {
+        if ($eob !== false) {
             $this->eob = $eob;
         }
 
@@ -71,64 +69,47 @@ class FeeditableContent
 
     protected function init()
     {
+        $this->registerContentBlocks();
+        $this->registerPassthruBlocks();
 
-        foreach ($this->contentBlocks as $blockId => $blockDef) {
-            list($this->{"open" . ucfirst($blockId)}, $this->{"close" . ucfirst($blockId)}) = explode(
-                isset($blockDef['tmplstrSeparator']) ? $blockDef['tmplstrSeparator'] : $this->tmplstrSeparator,
-                $blockDef['template']
-            );
+        foreach ($this->contentBlocks as $contentBlock) {
+            if (!$contentBlock->exclude) {
+                $this->{"open".ucfirst($contentBlock->blockType)} = $debug = $contentBlock->openContainer();
+                $this->{"close".ucfirst($contentBlock->blockType)} = $debug = $contentBlock->closeContainer();
+            }
         }
-
-        $this->contentBlocks = array_merge(
-            [
-                "exclude-10" => [
-                    "mdregex" => '/^$/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-20" => [
-                    "mdregex" => '/^-- row .*/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-20" => [
-                    "mdregex" => '/^-- grid .*/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-30" => [
-                    "mdregex" => '/^----$/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-35" => [
-                    "mdregex" => '/^--$/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-40" => [
-                    "mdregex" => '/^-- end --$/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-                "exclude-45" => [
-                    "mdregex" => '/^-- grid --$/',
-                    "template" => '',
-                    "insert" => 'ownline'
-                ],
-            ],
-            $this->contentBlocks
-        );
     }
 
-    public function getSegment($eob = true)
+    protected function registerContentBlocks()
     {
-        if ($eob) {
+        $this->contentBlocks = [
+            new blocks\feeditableTextBlock($this),
+        ];
+    }
+
+    protected function registerPassthruBlocks()
+    {
+        $excludeBlocks = [
+            new blocks\passthruContentBlock($this, '/^$/'),
+            new blocks\passthruContentBlock($this, '/^-- row .*/'),
+            new blocks\passthruContentBlock($this, '/^-- grid .*/'),
+            new blocks\passthruContentBlock($this, '/^----$/'),
+            new blocks\passthruContentBlock($this, '/^--$/'),
+            new blocks\passthruContentBlock($this, '/^-- end --$/'),
+            new blocks\passthruContentBlock($this, '/^-- grid --$/'),
+        ];
+        $this->contentBlocks = array_merge($excludeBlocks, $this->contentBlocks);
+    }
+
+    public function getSegment($withEob = true)
+    {
+        if ($withEob) {
             $content = implode($this->getEob(), $this->getContent());
         } else {
             $this->segmentLoadedMsg = '';
             $content = implode($this->getContent());
         }
+
         return $content;
     }
 
@@ -151,7 +132,7 @@ class FeeditableContent
     {
         if ($this->blocks[$id]) {
 
-            $this->blocks[$id] = $content . $this->eob;
+            $this->blocks[$id] = $content.$this->getEob();
 
             // Reindex all blocks
             $modified = $this->plugin->renderRawContent(implode($this->getContent()), $this->getFormat(), true);
@@ -159,6 +140,7 @@ class FeeditableContent
 
             return true;
         }
+
         return false;
     }
 
@@ -175,7 +157,7 @@ class FeeditableContent
     public function setContentBlocks($content, $startWithBlockId = 0, $segmentId = false)
     {
         // replace empty content
-        if (trim($content) == '' || trim($content) == PHP_EOL) {
+        if (trim($content) == '' || trim($content) == $this->getEob()) {
             $content = $this->editableEmptySegmentContent;
         }
 
@@ -187,7 +169,7 @@ class FeeditableContent
         switch ($this->format) {
             // currently only markdown supported
             case 'markdown':
-                $this->{'identify' . ucfirst($this->format) . 'Blocks'}($content, $startWithBlockId, $segmentId);
+                return $this->{'identify'.ucfirst($this->format).'Blocks'}($content, $startWithBlockId, $segmentId);
             case 'raw':
             default:
                 // do nothing (yet)
@@ -204,7 +186,7 @@ class FeeditableContent
         if (!($this->pluginConfig['editable_prefix'] && $this->format && $this->segmentid)) {
             return false;
         } else {
-            return $this->pluginConfig['editable_prefix'] . $this->format . '-' . $this->segmentid . '#' . $elemId;
+            return $this->pluginConfig['editable_prefix'].$this->format.'-'.$this->segmentid.'#'.$elemId;
         }
     }
 
@@ -216,7 +198,7 @@ class FeeditableContent
         return array(
             'elemid' => $elemid,
             'segmentid' => $currsegmentid,
-            'contenttype' => $contenttype ? $contenttype : $this->format
+            'contenttype' => $contenttype ? $contenttype : $this->format,
         );
     }
 
@@ -230,7 +212,7 @@ class FeeditableContent
 
     public function getEditableContainer($segmentId, $content)
     {
-        return '<form method="post" segmentid="' . $segmentId . '">' . $content . '</form>';
+        return '<form method="post" segmentid="'.$segmentId.'">'.$content.'</form>';
     }
 
     /**
@@ -241,236 +223,70 @@ class FeeditableContent
      */
     protected function identifyMarkdownBlocks($content, $offset = 0, $segmentId = false)
     {
-        $segmentId  = $segmentId ? $segmentId : $this->segmentid;
-        $class      = $this->pluginConfig['editable_prefix'] . $this->format . '-' . $segmentId;
-        $eol        = PHP_EOL;
-        $blockId    = false;
-        $openBlock  = true;
-        $b_type     = null;
+        $this->currBlockId = false;
+        $this->currSegmentId = $segmentId ? $segmentId : $this->segmentid;
 
-        // prepare for indexing
+        $class = $this->pluginConfig['editable_prefix'].$this->format.'-'.$this->currSegmentId;
+        $b_def = null;
         $content = $this->stripEmptyContentblocks($content);
+        $lines = explode($this->getEob(), $content);
+        $ctr = 0;
+        $ctlines = count($lines);
+
         $this->plugin->defineLineFeed($this->getFormat(), '<!--eol-->');
 
-        $lines = explode($eol, $content);
-        //foreach ($lines as $ctr => $line)
-        while (list($ctr, $line) = each($lines))
-        {
-            $lineno = $this->calcLineIndex($ctr, $offset, $segmentId);
+        while ($ctr < $ctlines) {
 
-            // switch between save- and edit-view
-            $withCmdSave = strpos($this->plugin->cmd, 'save') !== false ? true : false;
+            $line = $lines[$ctr];
 
-            // sanitize the found contents:
-            $line = strtr( $line, [
-                    // eg. get rid of MS's-CRs
-                    "\r" => ''
-            ]);
+            // sanitize the found contents, i.e. get rid of MS's-CRs:
+            $line = strtr($line, ["\r" => '']);
 
-            if($line == '') continue;
+            // do nothing, if line is empty
+            if ('' == $line) {
+                $ctr++;
+                continue;
+            }
 
-            // opening a new block requires closing the previous one
-            if ($blockId !== false)
-            {
-                $this->blocks[$blockId + 1] = ($segmentId === false)
+            // opening a new block requires closing the eventually still opened previous one
+            if ($b_def instanceof blocks\abstractContentBlock && $this->currBlockId !== false) {
+
+                $this->blocks[$this->currBlockId + 1] = ($this->currSegmentId === false)
                     ? ''
-                    : $this->insertEditableTag(
-                        $blockId,
-                        $class,
-                        'stop',
-                        $b_type,
-                        MARKDOWN_EOL
-                    );
-                $blockId = false;
-                $openBlock = true;
+                    : $b_def->insertEditableTag($this->currBlockId, $class, 'stop', MARKDOWN_EOL);
+
+                $this->currBlockId = false;
             }
 
             // current line matches a block-definition?
-            foreach ($this->contentBlocks as $b_type => $b_def)
-            {
-                if(stripos($b_type, 'exclude-')!==false) continue;
+            foreach ($this->contentBlocks as $b_def) {
 
-                switch($b_type)
-                {
-                    case 'textBlock':
-                    case 'midpageBlock':
+                $pointer = $b_def->filterLine($lines, $ctr, $offset);
+                if ($pointer > $ctr) {
 
-                        if ($openBlock && preg_match($b_def['mdregex'], $line, $test))
-                        {
-                            $blockId = $lineno;
-
-                            $this->blocks[$blockId - 1] = ($segmentId === false)
-                                ? ''
-                                : $this->insertEditableTag(
-                                    $blockId,
-                                    $class,
-                                    'start',
-                                    'textBlock',
-                                    MARKDOWN_EOL
-                                );
-                            do
-                            {
-                                // editing pure text still requires to us mask some chars?
-                                if ($withCmdSave === false && isset($b_def['editingMaskMap']))
-                                {
-                                    $line = strtr($line, $b_def['editingMaskMap']);
-                                }
-
-                                if(!isset($this->blocks[$blockId]))
-                                    $this->blocks[$blockId] = $line;
-                                else
-                                    $this->blocks[$blockId] .= $line;
-
-                                $this->blocks[$blockId] .= ($b_def['insert'] == 'multiline')
-                                    ? $this->getLineFeedMarker($this->getFormat())
-                                    : $eol;
-
-                                list($ctr, $line) = each($lines);
-                            }
-                            while (
-                                preg_match(@$b_def['mdregexStop'], $line, $test) == 0
-                                && $ctr
-                            );
-
-                            // Rewind after
-                            prev($lines);
-                        }
-
-                        break;
-
-                    default:
-
-                        // looking for special content which need its own block
-                        if (
-                            preg_match($b_def['mdregex'], $line, $test)
-                        ) {
-                            // in case editing requires some masking...
-                            if ($withCmdSave === false && isset($b_def['editingMaskMap']))
-                            {
-                                $line = strtr($line, $b_def['editingMaskMap']);
-                            }
-
-                            if ($b_def['template'] !== '')
-                            {
-                                // search for the block's data
-                                preg_match($b_def['dataregex'], $line, $b_data);
-                                if (count($b_data) > 1) array_shift($b_data);
-
-                                switch ($b_def['insert'])
-                                {
-                                    case 'inline':
-                                        $this->blocks[$lineno] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'auto',
-                                            $b_type,
-                                            '',
-                                            $b_data
-                                        );
-                                        break;
-
-                                    case 'ownline':
-                                        $this->blocks[$lineno] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'auto',
-                                            $b_type,
-                                            MARKDOWN_EOL,
-                                            $b_data
-                                        );
-                                        break;
-
-                                    case 'inlineButWriteRegex0':
-                                        $this->blocks[$lineno] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'auto',
-                                            $b_type,
-                                            '',
-                                            $withCmdSave !== false ? reset($b_data) : array_slice($b_data, 1)
-                                        );
-                                        break;
-
-                                    case 'inlineFilter':
-                                        if(isset($b_def['userfunc'])) {
-                                            $test = call_user_func(array($this->plugin->page, $b_def['userfunc']));
-                                            $filter = preg_filter($b_def['datafilter'], $b_def['datareplace'], $test);
-                                        } else {
-                                            $filter = preg_filter($b_def['datafilter'], $b_def['datareplace'], $line);
-                                        }
-                                        if(isset($b_def['trim'])){
-                                            $filter = trim($filter, $b_def['trim']);
-                                        }
-                                        $b_data[] = $filter;
-                                        $this->blocks[$lineno] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'auto',
-                                            $b_type,
-                                            '',
-                                            $b_data
-                                        );
-                                        break;
-
-                                    case 'ownlineButWriteRegex0':
-                                        $this->blocks[$lineno] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'auto',
-                                            $b_type,
-                                            MARKDOWN_EOL,
-                                            $withCmdSave !== false ? reset($b_data) : array_slice($b_data, 1)
-                                        );
-                                        break;
-
-                                    case 'array':
-                                        $this->blocks[$lineno - 1] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'start',
-                                            $b_type,
-                                            MARKDOWN_EOL
-                                        );
-                                        $this->blocks[$lineno] = reset($b_data);
-                                        $this->blocks[$lineno + 1] = $this->insertEditableTag(
-                                            $lineno,
-                                            $class,
-                                            'stop',
-                                            $b_type,
-                                            MARKDOWN_EOL
-                                        );
-                                        break;
-                                }
-                            }
-
-                            // build next block
-                            continue 3;
-                        }
+                    $ctr = $pointer;
+                    continue 2;
                 }
             }
+            $ctr++;
         }
 
         // if the last block of multiple lines is still open, we close it
-        if ($blockId)
-        {
-            $this->blocks[$blockId + 1] = ($segmentId === false)
+        if ($this->currBlockId) {
+
+            $this->blocks[$this->currBlockId + 1] = ($this->currSegmentId === false)
                 ? ''
-                : $this->insertEditableTag(
-                    $blockId,
-                    $class,
-                    'stop',
-                    $b_type,
-                    MARKDOWN_EOL
-                );
+                : $b_def->insertEditableTag($this->currBlockId, $class, 'stop', MARKDOWN_EOL);
         }
 
         end($this->blocks);
+
         return key($this->blocks) + $this->blockDimension;
     }
 
     private function stripEmptyContentblocks($content)
     {
-        $blocks = explode(PHP_EOL, $content);
+        $blocks = explode($this->getEob(), $content);
         $stripped = [];
         $lastBlockUid = 0;
         $beforeLastBlockUid = 0;
@@ -481,7 +297,6 @@ class FeeditableContent
                 && $beforeLastBlockUid
                 && $blockContents == ''
                 && $stripped[$lastBlockUid] == ''
-//                && $stripped[$beforeLastBlockUid] == ''
             ) {
                 continue;
             } else {
@@ -490,89 +305,25 @@ class FeeditableContent
             $beforeLastBlockUid = $lastBlockUid;
             $lastBlockUid = $blockUid;
         }
-        return implode(PHP_EOL, $stripped);
+
+        return implode($this->getEob(), $stripped);
     }
 
-    private function calcLineIndex($ctr, $offset, $segmentId = false)
+    public function calcLineIndex($ctr, $offset, $segmentId = false)
     {
         $segmentId = $segmentId ? $segmentId : $this->segmentid;
         // index + 100 so we have enough "space" to create new blocks "on-the-fly" when editing the page
-        $lineno = $ctr * $this->blockDimension + $offset;
-        $lineno = $lineno + $segmentId;
-        return $lineno;
+        $currLineUid = $ctr * $this->blockDimension + $offset;
+        $currLineUid = $currLineUid + $segmentId;
+
+        return $currLineUid;
     }
 
-    private function insertEditableTag(
-        $contentUid,
-        $contentClass,
-        $mode = 'auto',
-        $blockType = 'text',
-        $eol = PHP_EOL,
-        $formatterargs = []
-    ) {
-        if ($mode == 'stop') {
-            return $eol . $this->remToCloseCurrentBlockWith . $eol . PHP_EOL;
-        }
-
-        $class = $contentClass;
-        $id = $contentClass . '#' . $contentUid;
-
-        $stopBlock = $this->{'close' . ucfirst($blockType)};
-        $openBlock = $this->{'open' . ucfirst($blockType)};
-
-        $openBlock = strtr(
-            $openBlock,
-            array(
-                '###id###' => $id,
-                '###class###' => $class
-            )
-        );
-
-        if (!is_array($formatterargs)) {
-            $formatterargs = array($formatterargs);
-        }
-
-        $openBlock = @vsprintf($openBlock, $formatterargs);
-        $stopBlock = @vsprintf($stopBlock, $formatterargs);
-
-        switch ($mode) {
-
-            case 'start':
-
-                $stopmark = '<!-- ###' . $class . '### Stop -->';
-                $this->plugin->setReplacement($stopmark, $stopBlock);
-                $this->remToCloseCurrentBlockWith = $stopmark;
-
-                $startmark = '<!-- ###' . $id . '### Start -->';
-                $this->plugin->setReplacement($startmark, $openBlock);
-                return $eol . $startmark . $eol;
-
-            case 'wrap':
-
-                $id = $contentClass;
-                $class = $id;
-
-            case 'auto':
-            default:
-
-                $startmark = '<!-- ###' . $id . '### Start -->';
-                $stopmark = '<!-- ###' . $blockType . '### Stop -->';
-
-                //if( $this->plugin->getReplacement($stopmark) === false)
-                $this->plugin->setReplacement($stopmark, $stopBlock);
-
-                //if( $this->plugin->getReplacement($startmark) === false )
-                $this->plugin->setReplacement($startmark, $openBlock);
-
-                $ret = $eol . $startmark . $eol . reset($formatterargs) . $eol . $stopmark . $eol . PHP_EOL;
-                //$ret = vsprintf($ret, $formatterargs);
-
-                return $ret;
-        }
-    }
-
-    protected function getLineFeedMarker()
+    public function getLineFeedMarker()
     {
-        return PHP_EOL;
+        switch ($this->getFormat()) {
+            default:
+                return PHP_EOL;
+        }
     }
 } 

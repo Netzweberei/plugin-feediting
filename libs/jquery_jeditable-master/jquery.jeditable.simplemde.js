@@ -23,7 +23,7 @@ function iframeLoaded(iframeID) {
         iframe.height = "";
         $(iframe).css('height', iframe.height);
 
-        iframe.height = iframe.contentWindow.document.body.scrollHeight + "px";
+        iframe.height = iframe.contentWindow.document.body.offsetHeight + "px";
         $(iframe).css('height', iframe.height);
 
         console.log('set height to ' + iframe.height);
@@ -65,9 +65,11 @@ $.editable.addInputType('simplemde', {
             element: $(this).find('#'+$(original).attr('id')+' textarea')[0]
         });
 
-        //simplemde.codemirror.on("blur", function(){
-        //    console.log('blur...');
-        //});
+        simplemde.codemirror.on("change", function(){
+            if(window.frameElement && window.frameElement.id && window.parent) {
+                window.parent.iframeLoaded(window.frameElement.id);
+            }
+        });
 
         inlineAttachment.editors.codemirror4.attach(simplemde.codemirror, {
             onFileUploadResponse: function(xhr) {

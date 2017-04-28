@@ -777,7 +777,7 @@ class FeeditingPlugin
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
             foreach ($this->editorOptions as $editor => $option) {
-                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="color:white" class="selected"' : '').'>'.$option.'</a>';
+                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="text-decoration: underline;"' : '').'>'.$option.'</a>';
             }
             $this->includeIntoAdminpanel(
                 '<div class="feeditingpanel"><a name="FeditableContent"></a>'.$options.'</div>'

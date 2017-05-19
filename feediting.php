@@ -718,12 +718,14 @@ class FeeditingPlugin
                     $ret .= strtr($subcontent, $this->replace_pairs);
                 }
             }
-        } elseif (isset($this->editableContent[$contentId])) {
+        } else {
+            if (isset($this->editableContent[$contentId])) {
 
-            $ret = $this->editableContent[$contentId]->getEditableContainer(
-                $contentId,
-                strtr($content, $this->replace_pairs)
-            );
+                $ret = $this->editableContent[$contentId]->getEditableContainer(
+                    $contentId,
+                    strtr($content, $this->replace_pairs)
+                );
+            }
         }
 
         return $ret;
@@ -767,7 +769,7 @@ class FeeditingPlugin
 
     protected function onOutputGenerated($response)
     {
-        if (!$this->isRealPage()) {
+        if ($response->getStatus() == 404 || !$this->isRealPage()) {
             return;
         }
 

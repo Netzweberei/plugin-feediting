@@ -2571,8 +2571,6 @@ Object.assign(BlockManager.prototype, require('./function-bind'), require('./med
 
     this.triggerBlockCountUpdate();
     this.mediator.trigger('block:limitReached', this.blockLimitReached());
-
-    return block;
   },
 
   removeBlock: function(blockID) {
@@ -2853,23 +2851,24 @@ Object.assign(BlockReorder.prototype, require('./function-bind'), require('./ren
     return this.$block.attr('id');
   },
 
-  onMouseDown: function(ev) {
+  onMouseDown: function() {
     this.mediator.trigger("block-controls:hide");
     EventBus.trigger("block:reorder:down");
   },
 
   onDrop: function(ev) {
-
     ev.preventDefault();
 
-    console.log('BlockReorder->onDrop()');
+    //console.log(this);
+    //console.log(ev);
 
     var dropped_on = this.$block,
     item_id = ev.originalEvent.dataTransfer.getData("Text"),
     block = $('#' + item_id);
 
-    console.log({'from': block.attr('data-instance')});
-    console.log({'to': dropped_on.attr('data-instance')});
+    //console.log(item_id);
+    //console.log(block);
+    //console.log(dropped_on);
 
     if (
         !_.isUndefined(item_id)
@@ -2893,16 +2892,10 @@ Object.assign(BlockReorder.prototype, require('./function-bind'), require('./ren
   },
 
   onDragStart: function(ev) {
-
     var btn = $(ev.currentTarget).parent();
 
     ev.originalEvent.dataTransfer.setDragImage(this.$block[0], btn.position().left, btn.position().top);
-
     ev.originalEvent.dataTransfer.setData('Text', this.blockId());
-
-    ev.originalEvent.dataTransfer.effectAllowed = 'copyMove';
-
-    console.log('BlockReorder->onDragStart()');
 
     EventBus.trigger("block:reorder:dragstart");
     this.$block.addClass('st-block--dragging');
@@ -5000,15 +4993,9 @@ Object.assign(FloatingBlockControls.prototype, require('./function-bind'), requi
 
     ev.preventDefault();
 
-    console.log('FloatingBlockControls->onDrop()');
-
     var dropped_on = this.$el,
-    item_id = ev.originalEvent.dataTransfer.getData("Text"),
+    item_id = ev.originalEvent.dataTransfer.getData("text/plain"),
     block = $('#' + item_id);
-
-    console.log(dropped_on);
-    console.log(ev);
-    console.log(block);
 
     if (
         !_.isUndefined(item_id)
@@ -5025,6 +5012,7 @@ Object.assign(FloatingBlockControls.prototype, require('./function-bind'), requi
         && dropped_on.attr('id') !== item_id
     ) {
         SirTrevor.dragBlockFromInstanceToInstance(block, dropped_on);
+
     }
 
     EventBus.trigger("block:reorder:dropped", item_id);
@@ -5401,12 +5389,11 @@ module.exports = {
 var $ = (typeof window !== "undefined" ? window.$ : typeof global !== "undefined" ? global.$ : null);
 
 function dragEnter(e) {
-  e.originalEvent.dataTransfer.dropEffect = "copyMove";
   e.preventDefault();
 }
 
 function dragOver(e) {
-  e.originalEvent.dataTransfer.dropEffect = "copyMove";
+  e.originalEvent.dataTransfer.dropEffect = "copy";
   $(e.currentTarget).addClass('st-drag-over');
   e.preventDefault();
 }
@@ -5584,50 +5571,37 @@ var SirTrevor = {
 
   dragBlockFromInstanceToInstance: function(block, dropped_on) {
 
-    console.log('dragBlockFromInstanceToInstance');
+      var fromInstance = SirTrevor.getInstance(block.attr('data-instance'));
+      var toInstance = SirTrevor.getInstance(dropped_on.parents(".st-outer").attr('id'));
+      var blockObj = fromInstance.block_manager.findBlockById(block.attr('id'));
 
-    var fromInstance = SirTrevor.getInstance(block.attr('data-instance'));
-    var toInstance = SirTrevor.getInstance(dropped_on.parents(".st-outer").attr('id'));
-    var blockObj = fromInstance.block_manager.findBlockById(block.attr('id'));
-    var positioner = new SirTrevor.BlockPositioner(blockObj.block, toInstance.block_manager.mediator);
+      block.attr('data-instance',dropped_on.attr('data-instance'));
 
-    if(fromInstance.options.effectAllowed == 'copy') {
-      var newType = blockObj.blockStorage.type;
-      var newData = (JSON.parse(JSON.stringify(blockObj.blockStorage.data)));
-      var blockObj = fromInstance.block_manager.createBlock(newType, newData);
-      var block = $(blockObj.el);
-      var dataInstance = dropped_on.parents(".st-outer").attr('id');
-    } else {
-      var dataInstance = dropped_on.attr('data-instance');
-    }
+      dropped_on.after(block);
 
-    block.attr('data-instance', dataInstance);
+      blockObj.instanceID = dropped_on.attr('data-instance');
+      blockObj.mediator = toInstance.mediator;
 
-    dropped_on.after(block);
-    dropped_on.attr('data-instance', dataInstance);
+      // Hide block-positioner after first move,
+      // couldn't recalculate block-positioner correctly after multiple moves!
+      //blockObj._initUIComponents();
+      //block.find(".st-block__ui").empty();
+      block.find(".st-block-positioner").remove();
 
-    blockObj.instanceID = dataInstance;
-    blockObj.mediator = toInstance.mediator;
-    blockObj._withUIComponent(
-        positioner,
-        '.st-block-ui-btn--reorder',
-        positioner.toggle
-    );
+      toInstance.removeBlockDragOver();
+      toInstance.block_manager.blocks.push(blockObj);
+      toInstance.block_manager._incrementBlockTypeCount(block.attr('data-type'));
+      toInstance.block_manager.triggerBlockCountUpdate();
+      toInstance.block_manager.mediator.trigger('block:limitReached', toInstance.block_manager.blockLimitReached());
 
-    toInstance.removeBlockDragOver();
-    toInstance.block_manager.blocks.push(blockObj);
-    toInstance.block_manager._incrementBlockTypeCount(block.attr('data-type'));
-    toInstance.block_manager.triggerBlockCountUpdate();
-    toInstance.block_manager.mediator.trigger('block:limitReached', toInstance.block_manager.blockLimitReached());
-
-    if(fromInstance.options.effectAllowed != 'copy') {
-      fromInstance.block_manager.removeBlock(block.attr('id'));
+//      fromInstance.block_manager.removeBlock(block.attr('id'));
       fromInstance.block_manager.triggerBlockCountUpdate();
-    }
 
-    // Remind the user to save his changes
-    // @todo: Remove this hack!
-    $(".st-submit input[type=submit]").css("background-color","#990000");
+      // Remind the user to save his changes
+      $(".st-submit input[type=submit]").css("background-color","#990000");
+
+      // @todo: keep block.storage consistent without submitting the whole form...
+      //$(".st-submit input[type=submit]").click();
   },
 };
 

@@ -326,4 +326,14 @@ class FeeditableContent
                 return PHP_EOL;
         }
     }
+
+    public function getFidelity()
+    {
+        switch(@$_REQUEST['editor']){
+            case 'iframe':
+                return 'lo';
+            default:
+                return 'hi';
+        }
+    }
 } 

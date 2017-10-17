@@ -28,28 +28,3 @@ body {
     width: 105px;
 }
 
-#widgetspanel {
-    position: fixed;
-    top: 0;
-    left: 0;
-    bottom: 0;
-    width: 0.1em;
-    background-color: #000000;
-    overflow-y: auto;
-    z-index: 99999;
-    padding: 0.2em;
-}
-
-#widgetspanel .st-block,
-/*#widgetspanel .st-block.st-icon--add.st-item-ready.st-block--with-plus::after,*/
-#widgetspanel .st-icon--add:after {
-    display: none;
-}
-
-#widgetspanel:hover {
-    width: 12em;
-}
-
-#widgetspanel:hover .st-block {
-    display: inherit;
-}

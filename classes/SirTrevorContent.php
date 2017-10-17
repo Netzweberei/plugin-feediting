@@ -63,19 +63,6 @@ class SirTrevorContent extends FeeditableContent
         $this->plugin->includeAfterBodyStarts('<form method="post">');
         $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
 
-        $this->plugin->includeAfterBodyStarts(
-            // Container to provide the widgets
-            '<div id="widgetspanel">' .
-            //'<h4>Available widgets:</h4>' .
-            '<textarea name="sirtrevor-widgetPanel" class="sirtrevor-widgetPanel" id="sirtrevor-widgetPanel" markdown="1">' .
-            '{"data":[' .
-            '{"type":"text","data":{"text":"DRAGME!"}},' .
-            '{"type":"text","data":{"text":"DRAGME2!"}}' .
-            ']}' .
-            '</textarea>' .
-            '</div>'
-        );
-
         $this->plugin->includeBeforeBodyEnds('</form>');
 
         $uploadPath = DIRECTORY_SEPARATOR.strtr(
@@ -99,7 +86,7 @@ class SirTrevorContent extends FeeditableContent
           "Image",
           "Video",
 //          "Tweet",
-//          "Widget"
+          "Widget"
         ],
         defaultType: "Text"
       });
@@ -110,35 +97,6 @@ class SirTrevorContent extends FeeditableContent
                 '</script>'
             );
         }
-
-        $this->plugin->includeBeforeBodyEnds(
-//            '<style>' .
-//            '.widgetspanel a.st-block-ui-btn.st-block-ui-btn--reorder.st-icon {visibility: visible}' .
-//            '.widgetspanel .st-block {width: 10px; height: 10px;}' .
-//            '.widgetspanel .st-block .st-block__inner {padding: 1.5em;}' .
-//            '.widgetspanel .st-block .st-block__inner .st-text-block {display: none;}' .
-//            '.widgetspanel .st-block .st-block__inner .st-block__ui {display: inline; opacity: 100;}' .
-//            '.widgetspanel .st-block .st-block__inner .st-block__ui .st-block-positioner {display: inline;}' .
-//            '.widgetspanel .st-block .st-block__inner .st-block__ui .st-block-positioner__inner {display: none;}' .
-//            '.widgetspanel .st-block .st-block__inner .st-block__ui .st-block-ui-btn--delete {display: none; }' .
-//            '</style>' .
-            '<script type="text/javascript" charset="utf-8">'.
-            'window.widgetPanel = new SirTrevor.Editor({
-                 el: $("#sirtrevor-widgetPanel"),
-                    blockTypes: [
-                        "Text",
-//                        "Heading",
-//                        "List",
-//                        "Quote",
-//                        "Image",
-//                        "Video",
-//                        "Tweet"
-                    ],
-                    defaultType: "Text",
-                    effectAllowed: "copy"
-                  });'.
-            '</script>'
-        );
 
         $this->plugin->includeBeforeBodyEnds($path.'libs/ios-html5-drag-drop-shim-master/ios-drag-drop.js');
         $this->plugin->includeAfterBodyStarts(
@@ -350,25 +308,31 @@ class SirTrevorContent extends FeeditableContent
 
     public function loadAvailableWidgets()
     {
-//        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        // @todo: Don't realize widgets through additional extension, but use iawritershortcodes instead!
+        // - embed iawritershortcode, i.e. link to a hidden subpage
+        // - configure subpage.md to use distinct layout (stored in layouts/theme/widgets)
+        // - configure subpage.md initially to stay hidden!
+        // - store subpage in its own _folder/index.md
+        //$widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        //$ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
+
         $ret = ['type' => 'widget'];
         $ret['data'] = [
             'available' => [
                 0 => [
-                    'name' => 'box 1',
-                    'icon' => 'widget',
-                    'type' => '_box',
-                    'uri' => '_box',
+                    'name' => 'Slider',
+//                    'icon' => 'widget',
+//                    'type' => '_slider',
+                    'uri' => '/_slider/index.md',
                 ],
                 1 => [
-                    'name' => 'box 2',
-                    'icon' => 'widget',
-                    'type' => '_box',
-                    'uri' => '_box',
+                    'name' => 'Box',
+//                    'icon' => 'widget',
+//                    'type' => '_box',
+                    'uri' => '/_box/index.md',
                 ],
             ],
         ];
-//        $ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
 
         die(json_encode($ret));
     }

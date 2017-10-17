@@ -34,6 +34,8 @@ class FeeditingPlugin
 
     protected $remove_pairs = [];
 
+    protected $contentEditor = null;
+
     protected $editableContent = [];
 
     protected $lateEditableContent = [];
@@ -42,7 +44,7 @@ class FeeditingPlugin
 
     private $editor = 'Feeditable';
 
-    private $editorOptions = ['SirTrevor' => 'Build', 'SimpleMDE' => 'Review'];
+    private $editorOptions = ['SirTrevor' => 'build', 'SimpleMDE' => 'review'];
 
     private $cmd;
 
@@ -270,6 +272,9 @@ class FeeditingPlugin
             // Disable Caching while editing
             DI::get('Twig')->getEnvironment()->setCache(false);
 
+            $pathalias  = strpos($page->path, '@')!==0 ? dirname(DI::get('Page')->getPath()).DIRECTORY_SEPARATOR.$page->path : $page->path;
+            $absfile    = DI::get('Alias')->get($pathalias);
+            $absdir     = dirname($absfile);
             $this->page = $page;
 
             if (
@@ -280,12 +285,18 @@ class FeeditingPlugin
                 $this->page->layout = 'widgets/block.html';
             }
 
+            // override default-layout
+            if (!empty($this->page->layout) && file_exists($absdir.'/.layouts/'.$this->page->layout)) {
+                DI::get('Twig')->getEnvironment()->getLoader()->prependPath($absdir.'/.layouts/');
+            }
+
             $this->cmd = @$_REQUEST['cmd'];
 
             $segmentId = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : '0';
             $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
             if (
-                isset($_REQUEST['cmd'])
+                count($this->editableContent)
+                && isset($_REQUEST['cmd'])
                 && in_array($segmentId, array_keys($this->editableContent))
                 && is_subclass_of(
                     $this->editableContent[$segmentId],
@@ -294,6 +305,17 @@ class FeeditingPlugin
                 && is_callable([$this->editableContent[$segmentId], $_REQUEST['cmd']])
             ) {
                 $this->cmd = $this->editableContent[$segmentId]->{$this->cmd}();
+            }
+            elseif (
+                isset($_REQUEST['cmd'])
+                && in_array('0['.$segmentId.']', array_keys($this->lateEditableContent))
+                && is_subclass_of(
+                    $this->lateEditableContent['0['.$segmentId.']'],
+                    '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
+                )
+                && is_callable([$this->lateEditableContent['0['.$segmentId.']'], $_REQUEST['cmd']])
+            ) {
+                $this->cmd = $this->lateEditableContent['0['.$segmentId.']']->{$this->cmd}();
             }
             $this->editPage($_twigify);
         }
@@ -339,6 +361,7 @@ class FeeditingPlugin
                 // grid(s) found, build a "segmented" segment
                 //todo: delegate this to contentblock?
                 foreach ($captured['grid'] as $gid => $g) {
+
                     // make the text preceding the grid editable
                     $beforegrid = trim($captured['beforegrid'][$gid]);
                     if ($beforegrid != '') {
@@ -346,7 +369,11 @@ class FeeditingPlugin
                     }
 
                     // append the gridstart as uneditable text
-                    $this->segments[$segmentId][] = PHP_EOL.$captured['gridstart'][$gid].PHP_EOL;
+                    if(is_array($this->segments[$segmentId])) {
+                        $this->segments[$segmentId][] = PHP_EOL.$captured['gridstart'][$gid].PHP_EOL;
+                    } else {
+                        $this->segments[$segmentId] = array(PHP_EOL.$captured['gridstart'][$gid].PHP_EOL);
+                    }
 
                     $cols = preg_split('/\\n+--\\n+/', $captured['gridcontent'][$gid]);
                     foreach ($cols as $col => $colcontent) {
@@ -362,7 +389,7 @@ class FeeditingPlugin
                     }
 
                     // append the gridend as uneditable text
-                    $this->segments[$segmentId][] = PHP_EOL.$captured['gridend'][$gid].PHP_EOL;
+                    $this->segments[$segmentId][] = PHP_EOL.$captured['gridend'][$gid].PHP_EOL.PHP_EOL;
 
                     // make the text trailing the grid editable
                     $aftergrid = trim($captured['aftergrid'][$gid]);
@@ -393,7 +420,7 @@ class FeeditingPlugin
 
     private function buildEditableSegment($segmentId, $content = '', $offset = 0, $buildSubsegment = false)
     {
-        $contentEditor = "herbie\\plugin\\feediting\\classes\\{$this->editor}Content";
+        $this->contentEditor = "herbie\\plugin\\feediting\\classes\\{$this->editor}Content";
 
         if ($buildSubsegment) {
 
@@ -402,7 +429,7 @@ class FeeditingPlugin
             }
             // push the grid back into the segment, but replace editor-contents AFTER 'renderContent' is triggered
             $subsegmentId = sprintf($this->subsegmentid_format, $segmentId, count($this->segments[$segmentId]));
-            $this->lateEditableContent[$subsegmentId] = new $contentEditor($this, $this->page->format, $subsegmentId);
+            $this->lateEditableContent[$subsegmentId] = new $this->contentEditor($this, $this->page->format, $subsegmentId);
             $offset = $this->lateEditableContent[$subsegmentId]->setContentBlocks($content, $offset);
 
             $this->segments[$segmentId][] = sprintf($this->subsegment_placeholder, $subsegmentId);
@@ -410,7 +437,7 @@ class FeeditingPlugin
             $this->segments[$subsegmentId] = true;
         } else {
 
-            $this->editableContent[$segmentId] = new $contentEditor($this, $this->page->format, $segmentId);
+            $this->editableContent[$segmentId] = new $this->contentEditor($this, $this->page->format, $segmentId);
             $this->editableContent[$segmentId]->setContentBlocks($content);
             $this->segments[$segmentId] = $this->editableContent[$segmentId]->getSegment();
         }
@@ -733,6 +760,10 @@ class FeeditingPlugin
 
     private function renderContent($contentId, $content, $format, $twigify = false)
     {
+        $feditor = new $this->contentEditor($this, $this->page->format);
+        $this->page->setData(['feeditor' => @$_REQUEST['editor']]);
+        $this->page->setData(['fefi' => $feditor->getFidelity()]);
+
         if ($twigify && !empty($content)) {
 
             //$content = DI::get('Twig')->renderString($content);
@@ -779,7 +810,7 @@ class FeeditingPlugin
         if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
             $options = '';
             foreach ($this->editorOptions as $editor => $option) {
-                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="text-decoration: underline;"' : '').'>'.$option.'</a>';
+                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="text-decoration: underline;"' : '').'>'.ucfirst($option).'</a>';
             }
             $this->includeIntoAdminpanel(
                 '<div class="feeditingpanel"><a name="FeditableContent"></a>'.$options.'</div>'

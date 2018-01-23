@@ -62,6 +62,7 @@ class SirTrevorContent extends FeeditableContent
     {
         $this->plugin->includeAfterBodyStarts('<form method="post">');
         $this->plugin->includeAfterBodyStarts('<input type="hidden" name="cmd" value="save">');
+
         $this->plugin->includeBeforeBodyEnds('</form>');
 
         $uploadPath = DIRECTORY_SEPARATOR.strtr(
@@ -85,7 +86,7 @@ class SirTrevorContent extends FeeditableContent
           "Image",
           "Video",
 //          "Tweet",
-//          "Widget"
+          "Widget"
         ],
         defaultType: "Text"
       });
@@ -96,9 +97,10 @@ class SirTrevorContent extends FeeditableContent
                 '</script>'
             );
         }
+
         $this->plugin->includeBeforeBodyEnds($path.'libs/ios-html5-drag-drop-shim-master/ios-drag-drop.js');
         $this->plugin->includeAfterBodyStarts(
-            '<script type="text/javascript" charset="utf-8">var iosDragDropShim = { enableEnterLeave: true }</script>'
+            '<script type="text/javascript" charset="utf-8">var iosDragDropShim = { enableEnterLeave: true, requireExplicitDraggable: true, holdToDrag: 300 }</script>'
         );
 //        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_fancybox/jquery.fancybox.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/locales/de.js');
@@ -306,25 +308,31 @@ class SirTrevorContent extends FeeditableContent
 
     public function loadAvailableWidgets()
     {
-//        $widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        // @todo: Don't realize widgets through additional extension, but use iawritershortcodes instead!
+        // - embed iawritershortcode, i.e. link to a hidden subpage
+        // - configure subpage.md to use distinct layout (stored in layouts/theme/widgets)
+        // - configure subpage.md initially to stay hidden!
+        // - store subpage in its own _folder/index.md
+        //$widgetsExtension = new \herbie\plugin\widgets\classes\WidgetsExtension($this->plugin->app);
+        //$ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
+
         $ret = ['type' => 'widget'];
         $ret['data'] = [
             'available' => [
                 0 => [
-                    'name' => 'box 1',
-                    'icon' => 'widget',
-                    'type' => '_box',
-                    'uri' => '_box',
+                    'name' => 'Slider',
+//                    'icon' => 'widget',
+//                    'type' => '_slider',
+                    'uri' => '/_slider/index.md',
                 ],
                 1 => [
-                    'name' => 'box 2',
-                    'icon' => 'widget',
-                    'type' => '_box',
-                    'uri' => '_box',
+                    'name' => 'Box',
+//                    'icon' => 'widget',
+//                    'type' => '_box',
+                    'uri' => '/_box/index.md',
                 ],
             ],
         ];
-//        $ret['data'] = $widgetsExtension->getAvailableWidgets('@site/widgets');
 
         die(json_encode($ret));
     }

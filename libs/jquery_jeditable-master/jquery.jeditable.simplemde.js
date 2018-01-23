@@ -23,7 +23,7 @@ function iframeLoaded(iframeID) {
         iframe.height = "";
         $(iframe).css('height', iframe.height);
 
-        iframe.height = iframe.contentWindow.document.body.offsetHeight + "px";
+        iframe.height = iframe.contentWindow.document.body.scrollHeight + "px";
         $(iframe).css('height', iframe.height);
 
         console.log('set height to ' + iframe.height);

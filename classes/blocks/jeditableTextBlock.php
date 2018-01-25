@@ -15,5 +15,5 @@ class jeditableTextBlock extends multilineContentBlock
     protected $mdregex = '/.*/';
     protected $mdregexStop = '/^(\\/_.*)?$/'; // Stop at blankline or iaWriterBlock
     protected $dataregex = '/.*/';
-    protected $template = '<div class="###class###" id="###id###">%s</div>';
+    protected $template = '<div class="###class###" id="###id###" markdown="1">%s</div>';
 }

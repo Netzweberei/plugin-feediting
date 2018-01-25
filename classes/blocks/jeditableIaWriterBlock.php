@@ -8,43 +8,45 @@
 
 namespace herbie\plugin\feediting\classes\blocks;
 
-
+/* Do nothing special here (any more), instead delegate the task to
+ * the iawritershortcodePlugin, which 'knows' more about these kinds
+ * of blocks!
+ */
 class jeditableIaWriterBlock extends inlineButWriteRegex0ContentBlock
 {
     protected $blockType = 'iaWriterBlock';
     protected $mdregex = '/(?<=^)\\/_.*\.md/s';
-    protected $template = '<iframe seamless id="###id###" onload="iframeLoaded(\'###id###\')" src="/###src###?editor=iframe" style="width: 100%%; border-width: 0px;" scrolling="no">|</iframe>';
-    protected $dataregex = '/(\/(_.*)\.md)/';
+    protected $template = '<div>|</div>';
+    protected $dataregex = '/(\/_.*\.md)/';
     protected $editingMaskMap = [];
     protected $tmplstrSeparator = '|';
 
     protected function insertBlock($currLineUid, $line)
     {
-        // search for the block's data
         preg_match($this->dataregex, $line, $b_data);
-
-        // support default routes to 'index'-files
-        $ret    = $this->withCmdSave !== false ? $b_data[1] : $b_data[2];
 
         $this->editableContent->blocks[$currLineUid] = $this->insertEditableTag(
             $currLineUid,
             $this->class,
             'auto',
             '',
-            $ret
+            $b_data[1]
         );
     }
 
-    public function insertEditableTag($contentUid, $contentClass, $mode = 'inline', $eol = PHP_EOL, $ret = null)
+    public function insertEditableTag($contentUid, $contentClass, $mode = 'inline', $eol = PHP_EOL, $slug = '')
     {
-        $class  = $contentClass;
-        $id     = $contentClass.'#'.$contentUid;
+        $class = $contentClass;
+        $id = $contentClass.'#'.$contentUid;
 
-        $openBlock = strtr($this->openContainer(), [
+        $openBlock = strtr(
+            $this->openContainer(),
+            [
                 '###id###' => $id,
                 '###class###' => $class,
-                '###src###' => dirname($ret)
-            ]);
+                '###src###' => strtr($slug, ['/index' => ''])
+            ]
+        );
         $stopBlock = $this->closeContainer();
 
         $startmark = '<!-- ###'.$id.'### Start -->';
@@ -53,6 +55,6 @@ class jeditableIaWriterBlock extends inlineButWriteRegex0ContentBlock
         $stopmark = '<!-- ###'.$this->blockType.'### Stop -->';
         $this->editableContent->plugin->setReplacement($stopmark, $stopBlock);
 
-        return $eol.$startmark.$eol.$ret.PHP_EOL.$eol.$stopmark.$eol.PHP_EOL;
+        return $eol.$startmark.$eol.PHP_EOL.$slug.PHP_EOL.$eol.$stopmark.$eol.PHP_EOL;
     }
 }

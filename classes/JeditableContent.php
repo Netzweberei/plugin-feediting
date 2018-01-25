@@ -20,12 +20,21 @@ class JeditableContent extends FeeditableContent
 
     protected $segmentLoadedMsg = 'twigify';
 
+    protected function init()
+    {
+        // Recursion! Update segments-uri
+        $this->plugin->setSegmentsUri(true);
+        $this->pluginConfig['contentSegment_WrapperPrefix'] = $this->plugin->getSegmentsUri().'jeditable';
+        $this->pluginConfig['editable_prefix'] = $this->plugin->getSegmentsUri().'-'.'jeditable';
+        parent::init();
+    }
+
     protected function registerContentBlocks()
     {
         $this->contentBlocks = [
             new blocks\jeditableHeadingBlock($this),
             new blocks\jeditableIaWriterBlock($this),
-            new blocks\jeditableBlocksBlock($this),
+//            new blocks\jeditableBlocksBlock($this),
             new blocks\jeditableWidgetBlock($this),
             new blocks\jeditableTextBlock($this),
         ];
@@ -33,7 +42,6 @@ class JeditableContent extends FeeditableContent
 
     public function load()
     {
-
         extract($this->decodeEditableId($_REQUEST['id']));
 
         $ret = $this->blocks[$elemid] ? $this->blocks[$elemid] : '';
@@ -54,63 +62,44 @@ class JeditableContent extends FeeditableContent
 
         if ($this->plugin->cmd == 'reload' && !$this->reloadPageAfterSave) {
             return
-                '<div class="'.$this->pluginConfig['contentSegment_WrapperPrefix'].$contentId.'">
-                '.
                 $content.
-                $this->setJSEditableConfig($contentId).
-                '
-                </div>';
+                $this->setJSEditableConfig($contentId, $this->plugin->getSegmentsUri());
+        } else {
+            $this->plugin->includeBeforeBodyEnds(
+                $this->setJSEditableConfig($this->segmentid, $this->plugin->getSegmentsUri())
+            );
+            return $content;
         }
-
-        $this->plugin->includeBeforeBodyEnds($this->setJSEditableConfig($this->segmentid));
-
-        return $content;
     }
 
-    protected function setJSEditableConfig($containerId = 0)
+    protected function setJSEditableConfig($containerId = 0, $containeruri = '')
     {
-        $blockSelector = '.'.$this->pluginConfig['editable_prefix'].$this->format.'-'.$containerId;
-        $segmentSelector = '.'.$this->pluginConfig['contentSegment_WrapperPrefix'].$containerId;
+        $blockSanitizer     = ['[' => '\\\[', ']' => '\\\]'];
+        $fnameSanitizer     = ['-' => ''];
+        $blockSelector      = '.'.$this->pluginConfig['editable_prefix'].$this->format.'-'.$containerId;
+        $segmentSelector    = $this->pluginConfig['contentSegment_WrapperPrefix'].$containerId;
+        $blockSelector      = strtr($blockSelector, $blockSanitizer);
+        $segmentFunctionName= strtr($segmentSelector, $fnameSanitizer);
 
-        $containerId = strtr(
-            $containerId,
-            [
-                '[' => '',
-                ']' => '',
-            ]
-        );
-        $blockSelector = strtr(
-            $blockSelector,
-            [
-                '[' => '\\\[',
-                ']' => '\\\]',
-            ]
-        );
-
-        $ret =
-            '<script type="text/javascript" charset="utf-8">
-            function withContainer'.ucfirst($containerId).'() {
-    $("'.$blockSelector.'").editable("?cmd=save&renderer=markdown", {
+        $ret = <<<EOT
+<script type="text/javascript" charset="utf-8">
+            function withContainer$segmentFunctionName() {
+    $("$blockSelector").editable("/$containeruri?cmd=save&renderer=markdown", {
         indicator : "<img src=\'/assets/feediting/libs/jquery_jeditable-master/img/indicator.gif\'>",
-        loadurl   : "?cmd=load&segmentid='.$containerId.'&renderer=markdown",
+        loadurl   : "/$containeruri?cmd=load&segmentid=$containerId&renderer=markdown",
         type      : "simplemde",
         submit    : "OK",
         cancel    : "Cancel",
         tooltip   : "Click to edit...",
         ajaxoptions : {
             replace : "with",
-            container : "'.$segmentSelector.'",
-            run: "withContainer'.ucfirst($containerId).'();"
+            container : ".$segmentSelector",
+            run: "callAllFunctions();"
         }
     });
 }
-
-$(document).ready(function(){
-    withContainer'.ucfirst($containerId).'();
-});
-
-
-</script>';
+</script>
+EOT;
 
         return $ret;
     }
@@ -122,10 +111,8 @@ $(document).ready(function(){
 
     public function getEditablesJsConfig($path = null)
     {
-        // also provide the 'spinner'
+        // Due to my basic programming skills, the files have to be included in reverse order ;-)
         $this->plugin->provideAsset($path.'libs/jquery_jeditable-master/img/indicator.gif');
-        // Due to my basic programming skills, the files have to be included in reverse order!
-//        $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_responsiveiframe/jquery.responsiveiframe.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/jquery_jeditable-master/jquery.jeditable.simplemde.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/simplemde/dist/codemirror.inline-attachment.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/simplemde/dist/inline-attachment.js');

@@ -53,7 +53,6 @@ class SirTrevorContent extends FeeditableContent
 
     public function getEditablesCssConfig($path = null)
     {
-        $this->plugin->includeIntoHeader($path.'libs/jquery_fancybox/jquery.fancybox.css');
         $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor-icons.css');
         $this->plugin->includeIntoHeader($path.'libs/sir-trevor-js/sir-trevor.css');
     }
@@ -102,7 +101,6 @@ class SirTrevorContent extends FeeditableContent
         $this->plugin->includeAfterBodyStarts(
             '<script type="text/javascript" charset="utf-8">var iosDragDropShim = { enableEnterLeave: true, requireExplicitDraggable: true, holdToDrag: 300 }</script>'
         );
-//        $this->plugin->includeBeforeBodyEnds($path . 'libs/jquery_fancybox/jquery.fancybox.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/locales/de.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/sir-trevor-js/sir-trevor.js');
         $this->plugin->includeBeforeBodyEnds($path.'libs/Eventable/eventable.js');

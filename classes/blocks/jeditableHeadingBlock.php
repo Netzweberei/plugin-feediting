@@ -13,7 +13,7 @@ class jeditableHeadingBlock extends arrayContentBlock
 {
     protected $blockType = 'headingBlock';
     protected $mdregex = '/#+/';
-    protected $template = '<div class="###class###" id="###id###">%s</div>';
+    protected $template = '<div class="###class###" id="###id###" markdown="1">%s</div>';
     protected $dataregex = '/.*/';
     protected $editingMaskMap = [];
 }

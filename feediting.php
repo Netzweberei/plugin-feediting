@@ -20,6 +20,8 @@ if (!defined('DS')) {
 
 class FeeditingPlugin
 {
+    protected $id;
+
     protected $config = [];
 
     protected $response;
@@ -27,6 +29,10 @@ class FeeditingPlugin
     protected $alias;
 
     protected $authenticated = false;
+
+    protected $segments = [];
+
+    protected $segmentsuri = '';
 
     protected $editableSegments = [];
 
@@ -44,7 +50,7 @@ class FeeditingPlugin
 
     private $editor = 'Feeditable';
 
-    private $editorOptions = ['SirTrevor' => 'build', 'SimpleMDE' => 'review'];
+    private $editorOptions = ['SirTrevor' => 'build', 'Jeditable' => 'review'];
 
     private $cmd;
 
@@ -61,6 +67,8 @@ class FeeditingPlugin
 
     private $isRealPage = true;
 
+    private $prefixEachContentSegment = false;
+
     public function __construct()
     {
         $this->config = DI::get('Config');
@@ -68,9 +76,43 @@ class FeeditingPlugin
         $this->authenticated = $this->isAuthenticated();
     }
 
-    protected function isAuthenticated()
+    public function __get($attrib)
     {
-        return (bool)@$_SESSION['LOGGED_IN'];
+        switch ($attrib) {
+            case 'app':
+            case 'segments':
+            case 'path':
+            case 'alias':
+            case 'cmd':
+            case 'replace_pairs':
+            case 'remove_pairs':
+                return $this->{$attrib};
+                break;
+            default:
+                return false;
+        }
+    }
+
+    public function __call($funcname, $args)
+    {
+        if ($this->authenticated === true) {
+            switch (count($args)) {
+                case 5:
+                    return $this->{$funcname}($args[0], $args[1], $args[2], $args[3], $args[4]);
+                case 4:
+                    return $this->{$funcname}($args[0], $args[1], $args[2], $args[3]);
+                case 3:
+                    return $this->{$funcname}($args[0], $args[1], $args[2]);
+                case 2:
+                    return $this->{$funcname}($args[0], $args[1]);
+                case 1:
+                    return $this->{$funcname}($args[0]);
+                default:
+                    return $this->{$funcname}();
+            }
+        } else {
+            return;
+        }
     }
 
     public function install()
@@ -85,9 +127,8 @@ class FeeditingPlugin
 
     public function onPluginsInitialized()
     {
-        // set defaults
         if ($this->config->isEmpty('plugins.config.feediting.contentSegment_WrapperPrefix')) {
-            $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'placeholder-');
+            $this->config->set('plugins.config.feediting.contentSegment_WrapperPrefix', 'feeditable-');
         }
 
         if ($this->config->isEmpty('plugins.config.feediting.editable_prefix')) {
@@ -110,12 +151,12 @@ class FeeditingPlugin
             && in_array($_GET['editor'], $this->editorOptions)
         ) {
             $editor = array_flip($this->editorOptions);
-            @$_SESSION['NWeditor'] = $editor[$_GET['editor']];
+            $this->userEditor = $_GET['editor'];
+            $_SESSION['NWeditor'] = $editor[$this->userEditor];
         }
-        $this->userEditor = @$_SESSION['NWeditor'];
 
         // set editor
-        switch ($this->userEditor) {
+        switch (@$_SESSION['NWeditor']) {
             case 'Htmlforms':
             case 'Feeditable':
                 $this->editor = 'Feeditable';
@@ -132,6 +173,110 @@ class FeeditingPlugin
                 $this->parseSubsegments = false;
         }
 
+        $this->userEditor = $this->editorOptions[$this->editor];
+
+    }
+
+    protected function onPageLoaded(\Herbie\Page $page)
+    {
+        if (!$this->isRealPage($page)) {
+            return;
+        }
+
+        $this->recursivePageLoads++;
+        if (
+            $this->isEditable($page)
+            && $this->recursivePageLoads <= 1
+        ){
+            $this->page = $page;
+            $this->setSegmentsUri();
+            $this->cmd  = isset($_REQUEST['cmd']) ? $_REQUEST['cmd'] : '';
+
+            // Disable Caching while editing
+            DI::get('Twig')->getEnvironment()->setCache(false);
+
+            $pathalias  = strpos($page->path, '@')!==0 ? dirname(DI::get('Page')->getPath()).DIRECTORY_SEPARATOR.$page->path : $page->path;
+            $absfile    = DI::get('Alias')->get($pathalias);
+            $absdir     = dirname($absfile);
+            $segmentId  = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : $this->segmentsuri.'0';
+            $absSegmentId = str_replace($this->segmentsuri, '', $segmentId);
+            $_twigify   = ($this->loadEditableSegments() == 'twigify') ? true : false;
+
+            // override default-layout
+            if (!empty($this->page->layout) && file_exists($absdir.'/.layouts/'.$this->page->layout)){
+                DI::get('Twig')->getEnvironment()->getLoader()->prependPath($absdir.'/.layouts/');
+            }
+
+            if (
+                count($this->editableContent)
+                && isset($_REQUEST['cmd'])
+                && in_array($absSegmentId, array_keys($this->editableContent))
+                && is_subclass_of(
+                    $this->editableContent[$absSegmentId],
+                    '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
+                )
+                && is_callable([$this->editableContent[$absSegmentId], $_REQUEST['cmd']])
+            ){
+                $this->cmd = $this->editableContent[$absSegmentId]->{$this->cmd}();
+            }
+            elseif (
+                isset($_REQUEST['cmd'])
+                && in_array('0['.$absSegmentId.']', array_keys($this->lateEditableContent))
+                && is_subclass_of(
+                    $this->lateEditableContent['0['.$absSegmentId.']'],
+                    '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
+                )
+                && is_callable([$this->lateEditableContent['0['.$absSegmentId.']'], $_REQUEST['cmd']])
+            ){
+                $this->cmd = $this->lateEditableContent['0['.$absSegmentId.']']->{$this->cmd}();
+            }
+
+            $this->editPage($_twigify);
+        }
+    }
+
+    protected function onOutputGenerated($response)
+    {
+        if ($response->getStatus() == 404 || !$this->isRealPage()) {
+            return;
+        }
+
+        $this->response = $response;
+        $this->self = $this->config->get('plugins.path').'/feediting/';
+
+        if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
+            $options = '';
+            foreach ($this->editorOptions as $editor => $option) {
+                $options .= '<a href="?editor='.$option.'" '.($this->userEditor == $option ? 'style="text-decoration: underline;"' : '').'>'.ucfirst($option).'</a>';
+            }
+            $this->includeIntoAdminpanel(
+                '<div class="feeditingpanel"><a name="FeditableContent"></a>'.$options.'</div>'
+            );
+        }
+        $this->includeIntoHeader($this->self.'assets/css/feediting.css');
+        $this->getEditablesCssConfig($this->self);
+        $this->getEditablesJsConfig($this->self);
+
+        $content = strtr($response->getContent(), $this->replace_pairs);
+
+        if ($this->parseSubsegments) {
+            // replace late-editor-contents at last
+            $late_replace_pairs = [];
+            foreach ($this->lateEditableContent as $editorId => $editor) {
+                $late_replace_pairs[sprintf($this->subsegment_placeholder, $editorId)] = $editor->getEditableContainer(
+                    $editorId,
+                    strtr($editor->getSegment(), $this->replace_pairs)
+                );
+            }
+            $content = strtr($content, $late_replace_pairs);
+        }
+
+        $response->setContent($content);
+    }
+
+    protected function isAuthenticated()
+    {
+        return (bool)@$_SESSION['LOGGED_IN'];
     }
 
     public function getConfig()
@@ -220,105 +365,9 @@ class FeeditingPlugin
         $this->includeIntoTag('</body>', $uri);
     }
 
-    public function __get($attrib)
+    public function resetRecursivePageLoads()
     {
-        switch ($attrib) {
-            case 'app':
-            case 'path':
-            case 'alias':
-            case 'cmd':
-            case 'replace_pairs':
-            case 'remove_pairs':
-                return $this->{$attrib};
-                break;
-            default:
-                return false;
-        }
-    }
-
-    public function __call($funcname, $args)
-    {
-        if ($this->authenticated === true) {
-            switch (count($args)) {
-                case 5:
-                    return $this->{$funcname}($args[0], $args[1], $args[2], $args[3], $args[4]);
-                case 4:
-                    return $this->{$funcname}($args[0], $args[1], $args[2], $args[3]);
-                case 3:
-                    return $this->{$funcname}($args[0], $args[1], $args[2]);
-                case 2:
-                    return $this->{$funcname}($args[0], $args[1]);
-                case 1:
-                default:
-                    return $this->{$funcname}($args[0]);
-            }
-        } else {
-            return;
-        }
-    }
-
-    protected function onPageLoaded(\Herbie\Page $page)
-    {
-        if (!$this->isRealPage($page)) {
-            return;
-        }
-
-        $this->recursivePageLoads++;
-        if (
-            $this->isEditable($page)
-            && $this->recursivePageLoads <= 1
-        ) {
-
-            // Disable Caching while editing
-            DI::get('Twig')->getEnvironment()->setCache(false);
-
-            $pathalias  = strpos($page->path, '@')!==0 ? dirname(DI::get('Page')->getPath()).DIRECTORY_SEPARATOR.$page->path : $page->path;
-            $absfile    = DI::get('Alias')->get($pathalias);
-            $absdir     = dirname($absfile);
-            $this->page = $page;
-
-            if (
-                isset($_REQUEST['editor'])
-                && 'iframe' == $_REQUEST['editor']
-                && 'default.html' == $page->layout
-            ) {
-                $this->page->layout = 'widgets/block.html';
-            }
-
-            // override default-layout
-            if (!empty($this->page->layout) && file_exists($absdir.'/.layouts/'.$this->page->layout)) {
-                DI::get('Twig')->getEnvironment()->getLoader()->prependPath($absdir.'/.layouts/');
-            }
-
-            $this->cmd = @$_REQUEST['cmd'];
-
-            $segmentId = (isset($_REQUEST['segmentid'])) ? $_REQUEST['segmentid'] : '0';
-            $_twigify = ($this->loadEditableSegments() == 'twigify') ? true : false;
-            if (
-                count($this->editableContent)
-                && isset($_REQUEST['cmd'])
-                && in_array($segmentId, array_keys($this->editableContent))
-                && is_subclass_of(
-                    $this->editableContent[$segmentId],
-                    '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
-                )
-                && is_callable([$this->editableContent[$segmentId], $_REQUEST['cmd']])
-            ) {
-                $this->cmd = $this->editableContent[$segmentId]->{$this->cmd}();
-            }
-            elseif (
-                isset($_REQUEST['cmd'])
-                && in_array('0['.$segmentId.']', array_keys($this->lateEditableContent))
-                && is_subclass_of(
-                    $this->lateEditableContent['0['.$segmentId.']'],
-                    '\\herbie\plugin\\feediting\\classes\\FeeditableContent'
-                )
-                && is_callable([$this->lateEditableContent['0['.$segmentId.']'], $_REQUEST['cmd']])
-            ) {
-                $this->cmd = $this->lateEditableContent['0['.$segmentId.']']->{$this->cmd}();
-            }
-            $this->editPage($_twigify);
-        }
+        $this->recursivePageLoads = 0;
     }
 
     private function isRealPage($page = null)
@@ -452,8 +501,13 @@ class FeeditingPlugin
             case 'save':
             case 'saveAndReturn':
 
-                if (isset($_POST['id'])) {
-
+                if (
+                    isset($_POST['id'])
+                    && (
+                        !isset($this->editableContent[0])
+                        || strpos($_POST['id'], $this->editableContent[0]->pluginConfig['editable_prefix']) === 0
+                    )
+                ) {
                     $changed = $this->collectChanges();
 
                     if ($changed['segmentid'] !== false) {
@@ -562,6 +616,11 @@ class FeeditingPlugin
                         break;
                     }
                 }
+                else {
+                    foreach($this->segments as $k => $v){
+                        $this->segments[$k] = strtr($v, $this->replace_pairs);
+                    }
+                }
                 break;
 
             case 'bypass':
@@ -623,6 +682,12 @@ class FeeditingPlugin
             'segmentid' => false,
             'contenttype' => false,
         ];
+
+        switch(@$_REQUEST['renderer']){
+            case 'markdown';
+            default:
+                $ret['contenttype'] = 'markdown';
+        }
 
         if (!isset($this->{$editableContent}[$posted['segmentid']])) {
             return $ret;
@@ -701,6 +766,40 @@ class FeeditingPlugin
         return $fheader;
     }
 
+    private function setSegmentsUri($contentSegmentWrapper=false)
+    {
+        if($contentSegmentWrapper){
+            $this->prefixEachContentSegment = true;
+        }
+        $pageData = $this->page->getData();
+        $urltobuild = $pageData['path'];
+        $urltobuild = ltrim($urltobuild, '@page/');
+        $urltobuild = rtrim($urltobuild, '.md');
+        $urltobuild = preg_replace(['/^\d\-/','/index/'],['',''],$urltobuild);
+        $urltobuild = rtrim($urltobuild, '/');
+        $this->segmentsuri = $urltobuild;
+    }
+
+    public function getSegmentsUri()
+    {
+        return $this->segmentsuri;
+    }
+
+    private function initSegments()
+    {
+        $this->setSegmentsUri();
+
+        $segments = $this->page->getSegments();
+        foreach($segments as $id => $s){
+            $this->segments[$this->segmentsuri.$id] = $s;
+        }
+
+        // set default segment for a blank page
+        if (!array_key_exists($this->segmentsuri.'0', $this->segments)) {
+            $this->segments = array_merge(array($this->segmentsuri.'0' => PHP_EOL), $this->segments);
+        }
+    }
+
     private function recognizePseudoSegmentById($segmentId)
     {
         parse_str($segmentId, $arr);
@@ -760,17 +859,9 @@ class FeeditingPlugin
 
     private function renderContent($contentId, $content, $format, $twigify = false)
     {
-        $feditor = new $this->contentEditor($this, $this->page->format);
-        $this->page->setData(['feeditor' => @$_REQUEST['editor']]);
-        $this->page->setData(['fefi' => $feditor->getFidelity()]);
-
         if ($twigify && !empty($content)) {
-
-            //$content = DI::get('Twig')->renderString($content);
             $content = strtr($content, array(constant(strtoupper($format).'_EOL') => PHP_EOL));
-            $content = Hook::trigger(Hook::FILTER, 'renderContent', $content, $this->page->getData());
         }
-
         return $content;
     }
 
@@ -779,7 +870,16 @@ class FeeditingPlugin
         $segments = [];
         $segment_register = [];
         foreach ($this->segments as $segmentId => $editableContainer) {
-            $segments[$segmentId] = $editableContainer;
+
+            $segments[$segmentId] = $this->prefixEachContentSegment ?
+                '<div class="'.$this->editableContent[0]->pluginConfig['contentSegment_WrapperPrefix'].$segmentId.'">'.
+                PHP_EOL.
+                $editableContainer.
+                PHP_EOL.
+                '</div>'
+                :
+                $editableContainer;
+
             // register compound segments (i.e. with subsegments)
             parse_str($segmentId, $register);
             $segment_register = $register + $segment_register;
@@ -787,53 +887,20 @@ class FeeditingPlugin
         if ($this->parseSubsegments) {
             foreach ($segment_register as $segmentId => $v) {
                 if (!is_array($segment_register[$segmentId])) {
-                    $editableContainer = $segments[$segmentId];
-                    $containerPlaceholder = sprintf($this->subsegment_placeholder, $segmentId);
-                    $segments[$segmentId] = $containerPlaceholder;
+                    $editableContainer      = $segments[$segmentId];
+                    $containerPlaceholder   = sprintf($this->subsegment_placeholder, $segmentId);
+                    $segments[$segmentId]   = $containerPlaceholder;
                     $this->replace_pairs[$containerPlaceholder] = $editableContainer;
                 }
             }
         }
+
+        foreach($segments as $i => $s){
+            $segments[strtr($i,[$this->segmentsuri => ''])] = $s;
+        }
+
         $this->page->setSegments($segments);
         $this->page->nocache = true;
-    }
-
-    protected function onOutputGenerated($response)
-    {
-        if ($response->getStatus() == 404 || !$this->isRealPage()) {
-            return;
-        }
-
-        $this->response = $response;
-        $this->self = $this->config->get('plugins.path').'/feediting/';
-
-        if ('UserEditor' == $this->config->get('plugins.config.feediting.editor')) {
-            $options = '';
-            foreach ($this->editorOptions as $editor => $option) {
-                $options .= '<a href="?editor='.$option.'" '.(@$_SESSION['NWeditor'] == $editor ? 'style="text-decoration: underline;"' : '').'>'.ucfirst($option).'</a>';
-            }
-            $this->includeIntoAdminpanel(
-                '<div class="feeditingpanel"><a name="FeditableContent"></a>'.$options.'</div>'
-            );
-        }
-        $this->includeIntoHeader($this->self.'assets/css/feediting.css');
-        $this->getEditablesCssConfig($this->self);
-        $this->getEditablesJsConfig($this->self);
-
-        $content = strtr($response->getContent(), $this->replace_pairs);
-
-        if ($this->parseSubsegments) {
-            // replace late-editor-contents at last
-            $late_replace_pairs = [];
-            foreach ($this->lateEditableContent as $editorId => $editor) {
-                $late_replace_pairs[sprintf($this->subsegment_placeholder, $editorId)] = $editor->getEditableContainer(
-                    $editorId,
-                    strtr($editor->getSegment(), $this->replace_pairs)
-                );
-            }
-            $content = strtr($content, $late_replace_pairs);
-        }
-        $response->setContent($content);
     }
 
     public function includeIntoAdminpanel($html)

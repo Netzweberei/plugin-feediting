@@ -17,6 +17,7 @@ use herbie\plugin\feediting\FeeditingPlugin;
 
 class FeeditableContent
 {
+    public $id;
 
     public $plugin;
 
@@ -59,12 +60,12 @@ class FeeditableContent
         if ($segmentid) {
             $this->segmentid = $segmentid;
         }
+
         if ($eob !== false) {
             $this->eob = $eob;
         }
 
         $this->init();
-
     }
 
     protected function init()
@@ -74,8 +75,8 @@ class FeeditableContent
 
         foreach ($this->contentBlocks as $contentBlock) {
             if (!$contentBlock->exclude) {
-                $this->{"open".ucfirst($contentBlock->blockType)} = $debug = $contentBlock->openContainer();
-                $this->{"close".ucfirst($contentBlock->blockType)} = $debug = $contentBlock->closeContainer();
+                $this->{"open".ucfirst($contentBlock->blockType)} = $contentBlock->openContainer();
+                $this->{"close".ucfirst($contentBlock->blockType)} = $contentBlock->closeContainer();
             }
         }
     }
@@ -322,9 +323,9 @@ class FeeditableContent
     public function getLineFeedMarker()
     {
         switch ($this->getFormat()) {
-            default:
-                return PHP_EOL;
         }
+
+        return PHP_EOL;
     }
 
     public function getFidelity()
@@ -332,8 +333,7 @@ class FeeditableContent
         switch(@$_REQUEST['editor']){
             case 'iframe':
                 return 'lo';
-            default:
-                return 'hi';
         }
+        return 'hi';
     }
 } 

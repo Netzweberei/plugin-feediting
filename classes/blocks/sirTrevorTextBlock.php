@@ -15,6 +15,9 @@ class sirTrevorTextBlock extends multilineContentBlock
     protected $mdregex = '/.*/';
     protected $dataregex = '/.*/';
     protected $template = '{"type":"text","data":{"text":"%s"}},';
-    protected $editingMaskMap = ['/site' => '@site'];
+    protected $editingMaskMap = [
+        '/site' => '@site', //use Herbie's Alias to resolve site-root
+        '"' => '\"' //unmasked doublequotes break SirTrevor's json-format!
+    ];
     protected $mdregexStop = '/^$/';
 }

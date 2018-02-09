@@ -13,8 +13,6 @@ namespace herbie\plugin\feediting\classes;
 
 use herbie\plugin\feediting\FeeditingPlugin;
 
-//use Herbie\DI;
-
 class FeeditableContent
 {
     public $id;
@@ -24,8 +22,6 @@ class FeeditableContent
     public $collectAllChanges = false;
 
     public $reloadPageAfterSave = true;
-
-    public $editableEmptySegmentContent = "\nclick to edit\n";
 
     public $currBlockId = false;
 
@@ -51,6 +47,13 @@ class FeeditableContent
 
     protected $tmplstrSeparator = '%s';
 
+    /**
+     * FeeditableContent constructor.
+     * @param FeeditingPlugin $plugin
+     * @param $format
+     * @param null $segmentid
+     * @param bool $eob
+     */
     public function __construct(FeeditingPlugin &$plugin, $format, $segmentid = null, $eob = false)
     {
         $this->plugin = $plugin;
@@ -64,7 +67,6 @@ class FeeditableContent
         if ($eob !== false) {
             $this->eob = $eob;
         }
-
         $this->init();
     }
 
@@ -72,11 +74,11 @@ class FeeditableContent
     {
         $this->registerContentBlocks();
         $this->registerPassthruBlocks();
-
         foreach ($this->contentBlocks as $contentBlock) {
+
             if (!$contentBlock->exclude) {
-                $this->{"open".ucfirst($contentBlock->blockType)} = $contentBlock->openContainer();
-                $this->{"close".ucfirst($contentBlock->blockType)} = $contentBlock->closeContainer();
+                $this->{"open" . ucfirst($contentBlock->blockType)} = $contentBlock->openContainer();
+                $this->{"close" . ucfirst($contentBlock->blockType)} = $contentBlock->closeContainer();
             }
         }
     }
@@ -88,9 +90,12 @@ class FeeditableContent
         ];
     }
 
-    protected function registerPassthruBlocks()
+    /**
+     * @param array $moreExcludeBlocks
+     */
+    protected function registerPassthruBlocks($moreExcludeBlocks = [])
     {
-        $excludeBlocks = [
+        $excludeBlocks = array_merge([
             new blocks\passthruContentBlock($this, '/^$/'),
             new blocks\passthruContentBlock($this, '/^-- row .*/'),
             new blocks\passthruContentBlock($this, '/^-- grid .*/'),
@@ -98,10 +103,14 @@ class FeeditableContent
             new blocks\passthruContentBlock($this, '/^--$/'),
             new blocks\passthruContentBlock($this, '/^-- end --$/'),
             new blocks\passthruContentBlock($this, '/^-- grid --$/'),
-        ];
+        ], $moreExcludeBlocks);
         $this->contentBlocks = array_merge($excludeBlocks, $this->contentBlocks);
     }
 
+    /**
+     * @param bool $withEob
+     * @return string
+     */
     public function getSegment($withEob = true)
     {
         if ($withEob) {
@@ -110,59 +119,67 @@ class FeeditableContent
             $this->segmentLoadedMsg = '';
             $content = implode($this->getContent());
         }
-
         return $content;
     }
 
+    /**
+     * @return bool|string
+     */
     public function getEob()
     {
         return $this->eob;
     }
 
+    /**
+     * @return array
+     */
     public function getContent()
     {
         return $this->blocks;
     }
 
+    /**
+     * @param $id
+     * @return bool|mixed
+     */
     public function getContentBlockById($id)
     {
         return $this->blocks[$id] ? $this->blocks[$id] : false;
     }
 
+    /**
+     * @param $id
+     * @param $content
+     * @return bool
+     */
     public function setContentBlockById($id, $content)
     {
         if ($this->blocks[$id]) {
-
-            $this->blocks[$id] = $content.$this->getEob();
-
+            $this->blocks[$id] = $content . $this->getEob();
             // Reindex all blocks
             $modified = $this->plugin->renderRawContent(implode($this->getContent()), $this->getFormat(), true);
             $this->setContentBlocks($modified);
-
             return true;
         }
-
         return false;
     }
 
+    /**
+     * @return string
+     */
     public function getFormat()
     {
         return $this->format;
     }
 
     /**
-     * @param string $content
-     * @param int $uid
-     * @return array('blocks', 'eop', 'format')
+     * @param $content
+     * @param int $startWithBlockId
+     * @param bool $segmentId
+     * @return mixed
      */
     public function setContentBlocks($content, $startWithBlockId = 0, $segmentId = false)
     {
-        // replace empty content
-        if (trim($content) == '' || trim($content) == $this->getEob()) {
-            $content = $this->editableEmptySegmentContent;
-        }
-
-        // fresh start or just apppend something?
         if (!$startWithBlockId) {
             $this->blocks = [];
         }
@@ -170,27 +187,38 @@ class FeeditableContent
         switch ($this->format) {
             // currently only markdown supported
             case 'markdown':
-                return $this->{'identify'.ucfirst($this->format).'Blocks'}($content, $startWithBlockId, $segmentId);
+                return $this->{'identify' . ucfirst($this->format) . 'Blocks'}($content, $startWithBlockId, $segmentId);
             case 'raw':
             default:
-                // do nothing (yet)
+                ;// do nothing (yet)
         }
     }
 
+    /**
+     * @return string
+     */
     public function getSegmentLoadedMsg()
     {
         return $this->segmentLoadedMsg;
     }
 
+    /**
+     * @param $elemId
+     * @return bool|string
+     */
     public function encodeEditableId($elemId)
     {
         if (!($this->pluginConfig['editable_prefix'] && $this->format && $this->segmentid)) {
             return false;
         } else {
-            return $this->pluginConfig['editable_prefix'].$this->format.'-'.$this->segmentid.'#'.$elemId;
+            return $this->pluginConfig['editable_prefix'] . $this->format . '-' . $this->segmentid . '#' . $elemId;
         }
     }
 
+    /**
+     * @param $elemuri
+     * @return array
+     */
     public function decodeEditableId($elemuri)
     {
         list($contenturi, $elemid) = explode('#', str_replace($this->pluginConfig['editable_prefix'], '', $elemuri));
@@ -203,17 +231,50 @@ class FeeditableContent
         );
     }
 
+    /**
+     * @param null $path
+     */
     public function getEditablesCssConfig($path = null)
     {
     }
 
+    /**
+     * @param null $path
+     */
     public function getEditablesJsConfig($path = null)
     {
     }
 
+    /**
+     * @param $segmentId
+     * @param $content
+     * @return string
+     */
     public function getEditableContainer($segmentId, $content)
     {
-        return '<form method="post" segmentid="'.$segmentId.'">'.$content.'</form>';
+        return '<form method="post" segmentid="' . $segmentId . '">' . $content . '</form>';
+    }
+
+    /**
+     * @param $ctr
+     * @param $offset
+     * @param bool $segmentId
+     * @return int
+     */
+    public function calcLineIndex($ctr, $offset, $segmentId = false)
+    {
+        $segmentId = $segmentId
+            ? $segmentId
+            : $this->segmentid;
+        $currLineUid = $ctr * $this->blockDimension + $offset;
+        $currLineUid = $currLineUid + $segmentId;
+
+        return $currLineUid;
+    }
+
+    public function getLineFeedMarker()
+    {
+        return PHP_EOL;
     }
 
     /**
@@ -226,45 +287,34 @@ class FeeditableContent
     {
         $this->currBlockId = false;
         $this->currSegmentId = $segmentId ? $segmentId : $this->segmentid;
-
-        $class = $this->pluginConfig['editable_prefix'].$this->format.'-'.$this->currSegmentId;
-        $b_def = null;
-        $content = $this->stripEmptyContentblocks($content);
-        $lines = explode($this->getEob(), $content);
-        $ctr = 0;
-        $ctlines = count($lines);
-
         $this->plugin->defineLineFeed($this->getFormat(), '<!--eol-->');
+        $class  = $this->pluginConfig['editable_prefix'] . $this->format . '-' . $this->currSegmentId;
+        $b_def  = null;
+        $content= $this->stripEmptyContentblocks($content);
+        $lines  = explode($this->getEob(), $content);
+        $ctr    = 0;
+        $ctlines= count($lines);
 
         while ($ctr < $ctlines) {
-
             $line = $lines[$ctr];
+//            $line = strtr($line, ["\r" => '']);
 
-            // sanitize the found contents, i.e. get rid of MS's-CRs:
-            $line = strtr($line, ["\r" => '']);
-
-            // do nothing, if line is empty
             if ('' == $line) {
                 $ctr++;
                 continue;
             }
 
-            // opening a new block requires closing the eventually still opened previous one
             if ($b_def instanceof blocks\abstractContentBlock && $this->currBlockId !== false) {
-
                 $this->blocks[$this->currBlockId + 1] = ($this->currSegmentId === false)
                     ? ''
                     : $b_def->insertEditableTag($this->currBlockId, $class, 'stop', MARKDOWN_EOL);
-
                 $this->currBlockId = false;
             }
 
-            // current line matches a block-definition?
             foreach ($this->contentBlocks as $b_def) {
-
                 $pointer = $b_def->filterLine($lines, $ctr, $offset);
-                if ($pointer > $ctr) {
 
+                if ($pointer > $ctr) {
                     $ctr = $pointer;
                     continue 2;
                 }
@@ -272,19 +322,20 @@ class FeeditableContent
             $ctr++;
         }
 
-        // if the last block of multiple lines is still open, we close it
         if ($this->currBlockId) {
-
             $this->blocks[$this->currBlockId + 1] = ($this->currSegmentId === false)
                 ? ''
                 : $b_def->insertEditableTag($this->currBlockId, $class, 'stop', MARKDOWN_EOL);
         }
 
         end($this->blocks);
-
         return key($this->blocks) + $this->blockDimension;
     }
 
+    /**
+     * @param $content
+     * @return string
+     */
     private function stripEmptyContentblocks($content)
     {
         $blocks = explode($this->getEob(), $content);
@@ -306,34 +357,6 @@ class FeeditableContent
             $beforeLastBlockUid = $lastBlockUid;
             $lastBlockUid = $blockUid;
         }
-
         return implode($this->getEob(), $stripped);
-    }
-
-    public function calcLineIndex($ctr, $offset, $segmentId = false)
-    {
-        $segmentId = $segmentId ? $segmentId : $this->segmentid;
-        // index + 100 so we have enough "space" to create new blocks "on-the-fly" when editing the page
-        $currLineUid = $ctr * $this->blockDimension + $offset;
-        $currLineUid = $currLineUid + $segmentId;
-
-        return $currLineUid;
-    }
-
-    public function getLineFeedMarker()
-    {
-        switch ($this->getFormat()) {
-        }
-
-        return PHP_EOL;
-    }
-
-    public function getFidelity()
-    {
-        switch(@$_REQUEST['editor']){
-            case 'iframe':
-                return 'lo';
-        }
-        return 'hi';
     }
 } 

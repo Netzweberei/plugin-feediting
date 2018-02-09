@@ -1,3 +1,6 @@
 [submodule "libs/simplemde"]
 	path = libs/simplemde
 	url = git@github.com:sparksuite/simplemde-markdown-editor.git
+[submodule "libs/sir-trevor-js"]
+	path = libs/sir-trevor-js
+	url = git@github.com:Netzweberei/sir-trevor-js.git
